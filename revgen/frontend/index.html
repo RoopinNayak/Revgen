@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="RevGen — AI-powered Merchant Growth Agent for upsell, cross-sell, and campaign generation.">
+  <meta name="description" content="RevGen — AI-powered Merchant Growth Agent Dashboard">
   <title>RevGen — AI Merchant Growth Agent</title>
   <link rel="stylesheet" href="style.css">
 </head>
@@ -15,92 +15,102 @@
         <span class="logo-icon">⚡</span>
         <span class="logo-text">RevGen</span>
       </div>
-      <span class="badge">Day 1 — Foundation</span>
+      <span class="badge">Merchant Growth Dashboard</span>
     </header>
 
-    <!-- Hero Section -->
-    <main class="hero">
-      <h1 class="hero-title">
-        <span class="hero-title-line">RevGen</span>
-        <span class="hero-subtitle">AI Merchant Growth Agent</span>
-      </h1>
-      <p class="hero-description">
-        Intelligent upsell &amp; cross-sell recommendations, campaign generation,
-        and growth insights — powered by AI.
-      </p>
-
-      <div class="status-card">
-        <div class="status-header">
-          <span class="status-dot"></span>
-          <span class="status-label">System Status</span>
-        </div>
-        <div class="status-grid">
-          <div class="status-item">
-            <span class="status-item-label">Frontend</span>
-            <span class="status-item-value online">Online</span>
-          </div>
-          <div class="status-item">
-            <span class="status-item-label">Backend</span>
-            <span class="status-item-value pending">Not Connected</span>
-          </div>
-          <div class="status-item">
-            <span class="status-item-label">Database</span>
-            <span class="status-item-value pending">Not Connected</span>
-          </div>
-          <div class="status-item">
-            <span class="status-item-label">AI Agent</span>
-            <span class="status-item-value pending">Not Connected</span>
-          </div>
-        </div>
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="dashboard-header">
+        <h1 class="page-title">RevGen Overview</h1>
+        <p class="page-subtitle">Real-time performance metrics &amp; store analytics</p>
       </div>
 
-      <div class="roadmap">
-        <h2 class="roadmap-title">Build Roadmap</h2>
-        <div class="roadmap-steps">
-          <div class="step active">
-            <div class="step-number">1</div>
-            <div class="step-info">
-              <span class="step-name">Foundation</span>
-              <span class="step-desc">Project structure &amp; server</span>
-            </div>
+      <!-- Error Banner -->
+      <div id="error-banner" class="error-banner hidden">
+        <span class="error-icon">⚠️</span>
+        <span id="error-message">Unable to load dashboard data. Please try again later.</span>
+      </div>
+
+      <!-- KPI Metrics Grid -->
+      <section class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-title">Total Revenue</div>
+          <div class="kpi-value" id="kpi-revenue">Loading...</div>
+          <div class="kpi-subtext">Lifetime store revenue</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Total Orders</div>
+          <div class="kpi-value" id="kpi-orders">Loading...</div>
+          <div class="kpi-subtext">Completed transactions</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Avg Order Value</div>
+          <div class="kpi-value" id="kpi-aov">Loading...</div>
+          <div class="kpi-subtext">Per order average</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Total Customers</div>
+          <div class="kpi-value" id="kpi-customers">Loading...</div>
+          <div class="kpi-subtext">Registered shoppers</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Total Products</div>
+          <div class="kpi-value" id="kpi-products">Loading...</div>
+          <div class="kpi-subtext">Active catalog items</div>
+        </div>
+      </section>
+
+      <!-- Tables Grid -->
+      <section class="tables-grid">
+        <!-- Top Products Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Top 5 Products by Revenue</h2>
           </div>
-          <div class="step">
-            <div class="step-number">2</div>
-            <div class="step-info">
-              <span class="step-name">Data Layer</span>
-              <span class="step-desc">Database &amp; seed data</span>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-number">3</div>
-            <div class="step-info">
-              <span class="step-name">AI Agent</span>
-              <span class="step-desc">LLM integration &amp; reasoning</span>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-number">4</div>
-            <div class="step-info">
-              <span class="step-name">Campaigns</span>
-              <span class="step-desc">Generation &amp; approval flow</span>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-number">5</div>
-            <div class="step-info">
-              <span class="step-name">Razorpay</span>
-              <span class="step-desc">Payment integration</span>
-            </div>
-          </div>
-          <div class="step">
-            <div class="step-number">6</div>
-            <div class="step-info">
-              <span class="step-name">Polish</span>
-              <span class="step-desc">Audit trail &amp; recovery</span>
-            </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Product</th>
+                  <th>Category</th>
+                  <th>Units Sold</th>
+                  <th>Revenue</th>
+                </tr>
+              </thead>
+              <tbody id="top-products-body">
+                <tr>
+                  <td colspan="5" class="table-loading">Loading top products...</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
-      </div>
+
+        <!-- Recent Orders Card -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Recent 10 Orders</h2>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Order ID</th>
+                  <th>Customer</th>
+                  <th>Amount</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody id="recent-orders-body">
+                <tr>
+                  <td colspan="4" class="table-loading">Loading recent orders...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Footer -->

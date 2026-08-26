@@ -5,6 +5,7 @@
 
 const express = require('express');
 const dotenv = require('dotenv');
+const path = require('path');
 
 // Load environment variables from .env file
 dotenv.config();
@@ -16,6 +17,9 @@ const PORT = process.env.PORT || 3000;
 
 // ─── Middleware ──────────────────────────────
 app.use(express.json());
+
+// Serve static frontend files
+app.use(express.static(path.join(__dirname, '../frontend')));
 
 // ─── Routes ─────────────────────────────────
 
@@ -47,9 +51,122 @@ app.get('/api/db-test', async (req, res) => {
   }
 });
 
+// 1. GET /api/dashboard
+app.get('/api/dashboard', async (req, res) => {
+  try {
+    // Execute aggregate queries for overall business metrics
+    const metricsQuery = `
+      SELECT
+        COALESCE(SUM(total_amount), 0) AS total_revenue,
+        COUNT(*) AS total_orders,
+        COALESCE(AVG(total_amount), 0) AS avg_order_value
+      FROM orders
+    `;
+
+    const customersQuery = `SELECT COUNT(*) AS total_customers FROM customers`;
+    const productsQuery = `SELECT COUNT(*) AS total_products FROM products`;
+
+    const [metricsResult, customersResult, productsResult] = await Promise.all([
+      pool.query(metricsQuery),
+      pool.query(customersQuery),
+      pool.query(productsQuery),
+    ]);
+
+    const metrics = metricsResult.rows[0];
+    const totalCustomers = parseInt(customersResult.rows[0].total_customers, 10);
+    const totalProducts = parseInt(productsResult.rows[0].total_products, 10);
+
+    res.json({
+      totalRevenue: parseFloat(metrics.total_revenue),
+      totalOrders: parseInt(metrics.total_orders, 10),
+      averageOrderValue: parseFloat(metrics.avg_order_value),
+      totalCustomers: totalCustomers,
+      totalProducts: totalProducts,
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard metrics:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to load dashboard data.',
+    });
+  }
+});
+
+// 2. GET /api/top-products
+app.get('/api/top-products', async (req, res) => {
+  try {
+    const query = `
+      SELECT
+        p.id,
+        p.name,
+        p.category,
+        SUM(oi.quantity)::INTEGER AS units_sold,
+        SUM(oi.quantity * oi.price)::NUMERIC(12,2) AS revenue
+      FROM products p
+      JOIN order_items oi ON p.id = oi.product_id
+      GROUP BY p.id, p.name, p.category
+      ORDER BY revenue DESC
+      LIMIT 5
+    `;
+
+    const result = await pool.query(query);
+
+    const topProducts = result.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      category: row.category,
+      unitsSold: parseInt(row.units_sold, 10),
+      revenue: parseFloat(row.revenue),
+    }));
+
+    res.json(topProducts);
+  } catch (error) {
+    console.error('Error fetching top products:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to load top products data.',
+    });
+  }
+});
+
+// 3. GET /api/recent-orders
+app.get('/api/recent-orders', async (req, res) => {
+  try {
+    const query = `
+      SELECT
+        o.id AS order_id,
+        c.name AS customer_name,
+        o.total_amount,
+        o.created_at
+      FROM orders o
+      JOIN customers c ON o.customer_id = c.id
+      ORDER BY o.created_at DESC
+      LIMIT 10
+    `;
+
+    const result = await pool.query(query);
+
+    const recentOrders = result.rows.map((row) => ({
+      id: row.order_id,
+      customerName: row.customer_name,
+      totalAmount: parseFloat(row.total_amount),
+      createdAt: row.created_at,
+    }));
+
+    res.json(recentOrders);
+  } catch (error) {
+    console.error('Error fetching recent orders:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to load recent orders data.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
   console.log(`DB test:     http://localhost:${PORT}/api/db-test`);
+  console.log(`Dashboard:   http://localhost:${PORT}`);
 });
