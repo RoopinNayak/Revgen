@@ -32,6 +32,19 @@
   --error: #ef4444;
   --warning: #f59e0b;
 
+  /* Priority Badges */
+  --priority-high-bg: rgba(239, 68, 68, 0.15);
+  --priority-high-border: rgba(239, 68, 68, 0.35);
+  --priority-high-text: #f87171;
+
+  --priority-medium-bg: rgba(245, 158, 11, 0.15);
+  --priority-medium-border: rgba(245, 158, 11, 0.35);
+  --priority-medium-text: #fbbf24;
+
+  --priority-low-bg: rgba(100, 116, 139, 0.15);
+  --priority-low-border: rgba(100, 116, 139, 0.35);
+  --priority-low-text: #94a3b8;
+
   /* Gradients */
   --gradient-hero: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
   --gradient-bg: radial-gradient(ellipse at 50% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
@@ -209,6 +222,275 @@ body {
 .kpi-subtext {
   font-size: 0.75rem;
   color: var(--text-muted);
+}
+
+/* ─── Growth Opportunities Section ─────────── */
+.opportunities-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.section-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.section-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.section-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.opportunities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+/* Opportunity Card */
+.opp-card {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  backdrop-filter: blur(12px);
+  transition: transform var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.opp-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 8px 30px rgba(99, 102, 241, 0.1);
+}
+
+.opp-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Priority Badges */
+.badge-priority {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 100px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-priority.priority-high {
+  background: var(--priority-high-bg);
+  border: 1px solid var(--priority-high-border);
+  color: var(--priority-high-text);
+}
+
+.badge-priority.priority-medium {
+  background: var(--priority-medium-bg);
+  border: 1px solid var(--priority-medium-border);
+  color: var(--priority-medium-text);
+}
+
+.badge-priority.priority-low {
+  background: var(--priority-low-bg);
+  border: 1px solid var(--priority-low-border);
+  color: var(--priority-low-text);
+}
+
+/* Score Section */
+.opp-score-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.opp-score-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.opp-score-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--accent-light);
+}
+
+.score-bar-bg {
+  width: 90px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  background: var(--gradient-hero);
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
+/* Opportunity Title & Summary */
+.opp-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.opp-summary {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* Metrics Row */
+.opp-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+}
+
+.opp-metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opp-metric-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.opp-metric-value {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.opp-metric-value.highlight {
+  color: var(--success);
+}
+
+/* View Details Toggle Button */
+.btn-details {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: var(--accent-light);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background var(--transition-base), border-color var(--transition-base);
+  width: 100%;
+}
+
+.btn-details:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.btn-details-arrow {
+  transition: transform var(--transition-base);
+  font-size: 0.75rem;
+}
+
+.btn-details.expanded .btn-details-arrow {
+  transform: rotate(180deg);
+}
+
+/* Expandable Details Panel */
+.opp-details-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  font-size: 0.825rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.opp-details-panel.hidden {
+  display: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.details-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.details-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--accent-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.details-text {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.details-disclaimer {
+  font-size: 0.725rem;
+  color: var(--text-muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: var(--spacing-sm);
+  font-style: italic;
+  line-height: 1.4;
+}
+
+/* Section States */
+.loading-state,
+.empty-state,
+.error-state {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--spacing-2xl) var(--spacing-md);
+  color: var(--text-muted);
+  font-style: italic;
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  border-radius: var(--radius-lg);
+}
+
+.error-state {
+  color: var(--error);
+  border-color: rgba(239, 68, 68, 0.3);
 }
 
 /* Tables Grid */
