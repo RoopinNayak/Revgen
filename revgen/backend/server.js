@@ -13,6 +13,7 @@ dotenv.config();
 const pool = require('./src/db');
 const { getProductPairAnalytics } = require('./src/analytics/productPairs');
 const { scoreOpportunities } = require('./src/analytics/opportunityScoring');
+const { explainOpportunities } = require('./src/analytics/opportunityExplanation');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -219,6 +220,38 @@ app.get('/api/analytics/opportunities', async (req, res) => {
   }
 });
 
+// 6. GET /api/analytics/opportunities/explained
+app.get('/api/analytics/opportunities/explained', async (req, res) => {
+  try {
+    const minOrdersWithBoth = req.query.minBoth ? parseInt(req.query.minBoth, 10) : 5;
+    const minConfidence = req.query.minConfidence ? parseFloat(req.query.minConfidence) : 0.05;
+    const minLift = req.query.minLift ? parseFloat(req.query.minLift) : 1.0;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 100;
+
+    // 1. Fetch candidate pairs from Stage 1 analytics
+    const pairAnalytics = await getProductPairAnalytics({
+      minOrdersWithBoth,
+      minConfidence,
+      minLift,
+      limit,
+    });
+
+    // 2. Score and rank opportunities using Stage 2 scoring model
+    const scoredOpportunities = scoreOpportunities(pairAnalytics);
+
+    // 3. Generate structured merchant explanations for each opportunity
+    const explainedOpportunities = explainOpportunities(scoredOpportunities);
+
+    res.json(explainedOpportunities);
+  } catch (error) {
+    console.error('Error generating opportunity explanations:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to generate opportunity explanations.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
@@ -226,7 +259,9 @@ app.listen(PORT, () => {
   console.log(`DB test:     http://localhost:${PORT}/api/db-test`);
   console.log(`Analytics:  http://localhost:${PORT}/api/analytics/product-pairs`);
   console.log(`Opportunities: http://localhost:${PORT}/api/analytics/opportunities`);
+  console.log(`Explained:   http://localhost:${PORT}/api/analytics/opportunities/explained`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
+
 
 
