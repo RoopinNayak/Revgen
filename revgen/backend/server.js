@@ -11,6 +11,8 @@ const path = require('path');
 dotenv.config();
 
 const pool = require('./src/db');
+const { getProductPairAnalytics } = require('./src/analytics/productPairs');
+const { scoreOpportunities } = require('./src/analytics/opportunityScoring');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -163,10 +165,68 @@ app.get('/api/recent-orders', async (req, res) => {
   }
 });
 
+// 4. GET /api/analytics/product-pairs
+app.get('/api/analytics/product-pairs', async (req, res) => {
+  try {
+    const minOrdersWithBoth = req.query.minBoth ? parseInt(req.query.minBoth, 10) : 5;
+    const minConfidence = req.query.minConfidence ? parseFloat(req.query.minConfidence) : 0.05;
+    const minLift = req.query.minLift ? parseFloat(req.query.minLift) : 1.0;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 100;
+
+    const pairAnalytics = await getProductPairAnalytics({
+      minOrdersWithBoth,
+      minConfidence,
+      minLift,
+      limit,
+    });
+
+    res.json(pairAnalytics);
+  } catch (error) {
+    console.error('Error fetching product pair analytics:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to compute product pair analytics.',
+    });
+  }
+});
+
+// 5. GET /api/analytics/opportunities
+app.get('/api/analytics/opportunities', async (req, res) => {
+  try {
+    const minOrdersWithBoth = req.query.minBoth ? parseInt(req.query.minBoth, 10) : 5;
+    const minConfidence = req.query.minConfidence ? parseFloat(req.query.minConfidence) : 0.05;
+    const minLift = req.query.minLift ? parseFloat(req.query.minLift) : 1.0;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 100;
+
+    // Fetch candidate pairs from Stage 1 analytics
+    const pairAnalytics = await getProductPairAnalytics({
+      minOrdersWithBoth,
+      minConfidence,
+      minLift,
+      limit,
+    });
+
+    // Score and rank opportunities using deterministic 4-component model
+    const opportunities = scoreOpportunities(pairAnalytics);
+
+    res.json(opportunities);
+  } catch (error) {
+    console.error('Error computing opportunity scores:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to compute opportunity scores.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
   console.log(`DB test:     http://localhost:${PORT}/api/db-test`);
+  console.log(`Analytics:  http://localhost:${PORT}/api/analytics/product-pairs`);
+  console.log(`Opportunities: http://localhost:${PORT}/api/analytics/opportunities`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
+
+
