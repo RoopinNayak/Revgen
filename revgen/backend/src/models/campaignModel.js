@@ -47,6 +47,8 @@ async function validateCampaignCreation(data) {
     title,
     description,
     estimatedRevenueOpportunity,
+    targetCount = 0,
+    missedCustomers,
   } = data;
 
   // 1. Title validation
@@ -113,6 +115,12 @@ async function validateCampaignCreation(data) {
     throw new Error('estimatedRevenueOpportunity must be a non-negative number.');
   }
 
+  // 9. Target count / missed customers resolution
+  let resolvedTargetCount = parseInt(targetCount || missedCustomers || 0, 10);
+  if (isNaN(resolvedTargetCount) || resolvedTargetCount < 0) {
+    resolvedTargetCount = 0;
+  }
+
   return {
     productAId: pAId,
     productBId: pBId,
@@ -123,6 +131,7 @@ async function validateCampaignCreation(data) {
     title: title.trim(),
     description: description.trim(),
     estimatedRevenueOpportunity: estRev,
+    targetCount: resolvedTargetCount,
   };
 }
 
@@ -139,6 +148,7 @@ async function createCampaign(data) {
       product_b_id,
       type,
       target_segment,
+      target_count,
       status,
       discount_percent,
       budget_limit,
@@ -146,7 +156,7 @@ async function createCampaign(data) {
       estimated_revenue_opportunity,
       created_at,
       updated_at
-    ) VALUES ($1, $2, $3, $4, $5, 'draft', $6, $7, $8, $9, NOW(), NOW())
+    ) VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, $8, $9, $10, NOW(), NOW())
     RETURNING id;
   `;
 
@@ -156,6 +166,7 @@ async function createCampaign(data) {
     validated.productBId,
     validated.type,
     validated.targetSegment,
+    validated.targetCount,
     validated.discountPercent,
     validated.budgetLimit,
     validated.description,
@@ -176,6 +187,7 @@ async function getAllCampaigns() {
       c.name AS title,
       c.type,
       c.target_segment AS "targetSegment",
+      c.target_count AS "targetCount",
       c.status,
       c.discount_percent::FLOAT AS "discountPercent",
       c.budget_limit::FLOAT AS "budgetLimit",
@@ -218,6 +230,7 @@ async function getCampaignById(id) {
       c.name AS title,
       c.type,
       c.target_segment AS "targetSegment",
+      c.target_count AS "targetCount",
       c.status,
       c.discount_percent::FLOAT AS "discountPercent",
       c.budget_limit::FLOAT AS "budgetLimit",
@@ -271,6 +284,7 @@ function mapCampaignRow(row) {
       : null,
     type: row.type,
     targetSegment: row.targetSegment,
+    targetCount: row.targetCount || 0,
     discountPercent: row.discountPercent,
     budgetLimit: row.budgetLimit,
     status: row.status,

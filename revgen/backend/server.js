@@ -27,6 +27,11 @@ const {
   resetCampaign,
   getCampaignAuditLogs,
 } = require('./src/models/campaignWorkflowModel');
+const {
+  executeCampaign,
+  getExecutionByCampaignId,
+  getAllExecutions,
+} = require('./src/models/campaignExecutionModel');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -430,6 +435,56 @@ app.get('/api/campaigns/:id/audit', async (req, res) => {
   }
 });
 
+// 16. POST /api/campaigns/:id/execute — Safely simulate execution of approved campaign
+app.post('/api/campaigns/:id/execute', async (req, res) => {
+  try {
+    const options = {
+      forceFail: req.body && req.body.forceFail === true,
+    };
+    const result = await executeCampaign(req.params.id, options);
+    res.json(result);
+  } catch (error) {
+    console.error(`Execution error for campaign ${req.params.id}:`, error.message);
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      error: error.message,
+    });
+  }
+});
+
+// 17. GET /api/campaigns/:id/execution — Fetch execution record for campaign
+app.get('/api/campaigns/:id/execution', async (req, res) => {
+  try {
+    const execution = await getExecutionByCampaignId(req.params.id);
+    if (!execution) {
+      return res.status(404).json({
+        error: 'Execution record not found for this campaign',
+      });
+    }
+    res.json({ execution });
+  } catch (error) {
+    console.error(`Error fetching execution for campaign ${req.params.id}:`, error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to fetch campaign execution.',
+    });
+  }
+});
+
+// 18. GET /api/executions — List all campaign executions
+app.get('/api/executions', async (req, res) => {
+  try {
+    const executions = await getAllExecutions();
+    res.json(executions);
+  } catch (error) {
+    console.error('Error fetching all executions:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to fetch executions list.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
@@ -440,8 +495,10 @@ app.listen(PORT, () => {
   console.log(`Explained:   http://localhost:${PORT}/api/analytics/opportunities/explained`);
   console.log(`Recommendation: http://localhost:${PORT}/api/campaigns/recommendation`);
   console.log(`Campaigns:   http://localhost:${PORT}/api/campaigns`);
+  console.log(`Executions:  http://localhost:${PORT}/api/executions`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
+
 
 
 

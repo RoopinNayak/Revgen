@@ -87,6 +87,7 @@ CREATE TABLE IF NOT EXISTS campaigns (
                                   CHECK (type IN ('upsell', 'cross_sell')),
   target_segment                VARCHAR(20) NOT NULL DEFAULT 'all'
                                   CHECK (target_segment IN ('budget', 'regular', 'premium', 'all')),
+  target_count                  INTEGER NOT NULL DEFAULT 0 CHECK (target_count >= 0),
   status                        VARCHAR(20) NOT NULL DEFAULT 'draft'
                                   CHECK (status IN (
                                     'draft',
@@ -129,3 +130,25 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_audit_logs_campaign_id
   ON audit_logs(campaign_id);
 
+
+-- ─── 7. campaign_executions ─────────────────
+-- Stores deterministic execution simulation records for approved campaigns.
+
+CREATE TABLE IF NOT EXISTS campaign_executions (
+  id                             SERIAL PRIMARY KEY,
+  campaign_id                    INTEGER NOT NULL UNIQUE REFERENCES campaigns(id),
+  execution_mode                 VARCHAR(20) NOT NULL DEFAULT 'simulation'
+                                   CHECK (execution_mode = 'simulation'),
+  status                         VARCHAR(20) NOT NULL
+                                   CHECK (status IN ('started', 'completed', 'failed')),
+  target_count                   INTEGER NOT NULL DEFAULT 0 CHECK (target_count >= 0),
+  simulated_conversions          INTEGER NOT NULL DEFAULT 0 CHECK (simulated_conversions >= 0),
+  estimated_revenue_opportunity  NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (estimated_revenue_opportunity >= 0),
+  simulated_revenue              NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (simulated_revenue >= 0),
+  details                        JSONB,
+  executed_at                    TIMESTAMP NOT NULL DEFAULT NOW(),
+  created_at                     TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_campaign_executions_campaign_id
+  ON campaign_executions(campaign_id);
