@@ -14,6 +14,12 @@ const pool = require('./src/db');
 const { getProductPairAnalytics } = require('./src/analytics/productPairs');
 const { scoreOpportunities } = require('./src/analytics/opportunityScoring');
 const { explainOpportunities } = require('./src/analytics/opportunityExplanation');
+const { recommendCampaign } = require('./src/analytics/campaignRecommendation');
+const {
+  createCampaign,
+  getAllCampaigns,
+  getCampaignById,
+} = require('./src/models/campaignModel');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -252,6 +258,95 @@ app.get('/api/analytics/opportunities/explained', async (req, res) => {
   }
 });
 
+// 7. GET /api/campaigns/recommendation — Preview bounded campaign proposal
+app.get('/api/campaigns/recommendation', async (req, res) => {
+  try {
+    const pAId = req.query.productAId ? parseInt(req.query.productAId, 10) : null;
+    const pBId = req.query.productBId ? parseInt(req.query.productBId, 10) : null;
+
+    // Fetch candidate pairs from analytics
+    const pairAnalytics = await getProductPairAnalytics({
+      minOrdersWithBoth: 1,
+      minConfidence: 0.01,
+      minLift: 1.0,
+      limit: 200,
+    });
+
+    const scoredOpportunities = scoreOpportunities(pairAnalytics);
+
+    let matchingOpp = null;
+    if (pAId && pBId) {
+      matchingOpp = scoredOpportunities.find(
+        (opp) => opp.productA.id === pAId && opp.productB.id === pBId
+      );
+    } else {
+      matchingOpp = scoredOpportunities[0];
+    }
+
+    if (!matchingOpp) {
+      return res.status(404).json({
+        error: 'Opportunity not found for specified product pair',
+      });
+    }
+
+    const proposal = recommendCampaign(matchingOpp);
+    res.json(proposal);
+  } catch (error) {
+    console.error('Error generating campaign recommendation:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to generate campaign recommendation preview.',
+    });
+  }
+});
+
+// 8. POST /api/campaigns — Create a campaign draft
+app.post('/api/campaigns', async (req, res) => {
+  try {
+    const campaign = await createCampaign(req.body);
+    res.status(201).json(campaign);
+  } catch (error) {
+    console.error('Campaign creation error:', error.message);
+    res.status(400).json({
+      status: 'error',
+      message: error.message,
+    });
+  }
+});
+
+// 9. GET /api/campaigns — List all campaigns
+app.get('/api/campaigns', async (req, res) => {
+  try {
+    const campaigns = await getAllCampaigns();
+    res.json(campaigns);
+  } catch (error) {
+    console.error('Error fetching campaigns:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to fetch campaigns.',
+    });
+  }
+});
+
+// 10. GET /api/campaigns/:id — Fetch single campaign
+app.get('/api/campaigns/:id', async (req, res) => {
+  try {
+    const campaign = await getCampaignById(req.params.id);
+    if (!campaign) {
+      return res.status(404).json({
+        error: 'Campaign not found',
+      });
+    }
+    res.json(campaign);
+  } catch (error) {
+    console.error(`Error fetching campaign ${req.params.id}:`, error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to fetch campaign.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
@@ -260,8 +355,12 @@ app.listen(PORT, () => {
   console.log(`Analytics:  http://localhost:${PORT}/api/analytics/product-pairs`);
   console.log(`Opportunities: http://localhost:${PORT}/api/analytics/opportunities`);
   console.log(`Explained:   http://localhost:${PORT}/api/analytics/opportunities/explained`);
+  console.log(`Recommendation: http://localhost:${PORT}/api/campaigns/recommendation`);
+  console.log(`Campaigns:   http://localhost:${PORT}/api/campaigns`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
+
+
 
 
 

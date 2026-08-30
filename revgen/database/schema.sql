@@ -79,25 +79,34 @@ CREATE INDEX IF NOT EXISTS idx_order_items_product_id
 -- code will also enforce this limit.
 
 CREATE TABLE IF NOT EXISTS campaigns (
-  id                SERIAL PRIMARY KEY,
-  name              VARCHAR(255) NOT NULL,
-  type              VARCHAR(20) NOT NULL
-                      CHECK (type IN ('upsell', 'cross_sell')),
-  status            VARCHAR(20) NOT NULL DEFAULT 'draft'
-                      CHECK (status IN (
-                        'draft',
-                        'pending_approval',
-                        'approved',
-                        'rejected',
-                        'executing',
-                        'completed',
-                        'failed'
-                      )),
-  discount_percent  NUMERIC(5, 2) NOT NULL DEFAULT 0
-                      CHECK (discount_percent >= 0 AND discount_percent <= 20),
-  budget_limit      NUMERIC(12, 2) NOT NULL DEFAULT 0
-                      CHECK (budget_limit >= 0),
-  created_at        TIMESTAMP NOT NULL DEFAULT NOW()
+  id                            SERIAL PRIMARY KEY,
+  name                          VARCHAR(255) NOT NULL,
+  product_a_id                  INTEGER REFERENCES products(id),
+  product_b_id                  INTEGER REFERENCES products(id),
+  type                          VARCHAR(20) NOT NULL
+                                  CHECK (type IN ('upsell', 'cross_sell')),
+  target_segment                VARCHAR(20) NOT NULL DEFAULT 'all'
+                                  CHECK (target_segment IN ('budget', 'regular', 'premium', 'all')),
+  status                        VARCHAR(20) NOT NULL DEFAULT 'draft'
+                                  CHECK (status IN (
+                                    'draft',
+                                    'pending_approval',
+                                    'approved',
+                                    'rejected',
+                                    'executed',
+                                    'executing',
+                                    'completed',
+                                    'failed'
+                                  )),
+  discount_percent              NUMERIC(5, 2) NOT NULL DEFAULT 0
+                                  CHECK (discount_percent >= 0 AND discount_percent <= 20),
+  budget_limit                  NUMERIC(12, 2) NOT NULL DEFAULT 0
+                                  CHECK (budget_limit >= 0),
+  description                   TEXT,
+  estimated_revenue_opportunity NUMERIC(12, 2) NOT NULL DEFAULT 0
+                                  CHECK (estimated_revenue_opportunity >= 0),
+  created_at                    TIMESTAMP NOT NULL DEFAULT NOW(),
+  updated_at                    TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 
