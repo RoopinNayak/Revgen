@@ -20,6 +20,13 @@ const {
   getAllCampaigns,
   getCampaignById,
 } = require('./src/models/campaignModel');
+const {
+  submitCampaign,
+  approveCampaign,
+  rejectCampaign,
+  resetCampaign,
+  getCampaignAuditLogs,
+} = require('./src/models/campaignWorkflowModel');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -347,6 +354,82 @@ app.get('/api/campaigns/:id', async (req, res) => {
   }
 });
 
+// 11. POST /api/campaigns/:id/submit — Submit draft campaign for approval
+app.post('/api/campaigns/:id/submit', async (req, res) => {
+  try {
+    const campaign = await submitCampaign(req.params.id);
+    res.json(campaign);
+  } catch (error) {
+    console.error(`Error submitting campaign ${req.params.id}:`, error.message);
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      error: error.message,
+    });
+  }
+});
+
+// 12. POST /api/campaigns/:id/approve — Approve pending campaign
+app.post('/api/campaigns/:id/approve', async (req, res) => {
+  try {
+    const campaign = await approveCampaign(req.params.id);
+    res.json(campaign);
+  } catch (error) {
+    console.error(`Error approving campaign ${req.params.id}:`, error.message);
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      error: error.message,
+    });
+  }
+});
+
+// 13. POST /api/campaigns/:id/reject — Reject pending campaign
+app.post('/api/campaigns/:id/reject', async (req, res) => {
+  try {
+    const reason = req.body && req.body.reason ? req.body.reason : null;
+    const campaign = await rejectCampaign(req.params.id, reason);
+    res.json(campaign);
+  } catch (error) {
+    console.error(`Error rejecting campaign ${req.params.id}:`, error.message);
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      error: error.message,
+    });
+  }
+});
+
+// 14. POST /api/campaigns/:id/reset — Reset rejected campaign to draft
+app.post('/api/campaigns/:id/reset', async (req, res) => {
+  try {
+    const campaign = await resetCampaign(req.params.id);
+    res.json(campaign);
+  } catch (error) {
+    console.error(`Error resetting campaign ${req.params.id}:`, error.message);
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      error: error.message,
+    });
+  }
+});
+
+// 15. GET /api/campaigns/:id/audit — Fetch campaign audit logs
+app.get('/api/campaigns/:id/audit', async (req, res) => {
+  try {
+    const auditLogs = await getCampaignAuditLogs(req.params.id);
+    if (auditLogs === null) {
+      return res.status(404).json({
+        error: 'Campaign not found',
+      });
+    }
+    res.json(auditLogs);
+  } catch (error) {
+    console.error(`Error fetching audit logs for campaign ${req.params.id}:`, error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to fetch campaign audit logs.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
@@ -359,6 +442,7 @@ app.listen(PORT, () => {
   console.log(`Campaigns:   http://localhost:${PORT}/api/campaigns`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
+
 
 
 

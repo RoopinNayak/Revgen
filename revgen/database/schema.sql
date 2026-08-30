@@ -116,11 +116,16 @@ CREATE TABLE IF NOT EXISTS campaigns (
 
 CREATE TABLE IF NOT EXISTS audit_logs (
   id            SERIAL PRIMARY KEY,
+  campaign_id   INTEGER REFERENCES campaigns(id),
   action        VARCHAR(255) NOT NULL,
   actor         VARCHAR(20) NOT NULL
                   CHECK (actor IN ('ai', 'merchant', 'system')),
-  status        VARCHAR(20) NOT NULL
+  status        VARCHAR(20) NOT NULL DEFAULT 'success'
                   CHECK (status IN ('success', 'failed', 'rejected')),
   details       JSONB,
   created_at    TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_campaign_id
+  ON audit_logs(campaign_id);
+
