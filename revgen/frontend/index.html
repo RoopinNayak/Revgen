@@ -144,6 +144,49 @@
     </footer>
   </div>
 
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Workflow Confirmation & Rejection Modal -->
+  <div id="workflow-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-title" class="modal-title">Action Confirmation</h3>
+        <button class="modal-close-btn" type="button" onclick="closeWorkflowModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="modal-message" class="modal-message"></p>
+        <div id="modal-input-container" class="modal-input-group hidden">
+          <label for="reject-reason-input" class="modal-label">Reason (optional):</label>
+          <input type="text" id="reject-reason-input" class="modal-input" placeholder="e.g. Budget is too high">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-cancel-btn" class="btn btn-secondary" type="button" onclick="closeWorkflowModal()">Cancel</button>
+        <button id="modal-confirm-btn" class="btn btn-primary" type="button">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audit Trail Modal -->
+  <div id="audit-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3 id="audit-modal-title" class="modal-title">Campaign Audit History</h3>
+        <button class="modal-close-btn" type="button" onclick="closeAuditModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="audit-timeline-container" class="audit-timeline">
+          <div class="loading-state">Loading audit events...</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" onclick="closeAuditModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
+

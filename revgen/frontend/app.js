@@ -345,6 +345,9 @@ function renderCampaignCard(camp) {
   } else if (rawStatus === 'rejected') {
     statusText = 'REJECTED';
     statusClass = 'status-rejected';
+  } else if (rawStatus === 'completed' || rawStatus === 'executed') {
+    statusText = 'COMPLETED';
+    statusClass = 'status-completed';
   } else {
     statusText = rawStatus.toUpperCase().replace(/_/g, ' ');
     statusClass = `status-${rawStatus}`;
@@ -355,6 +358,39 @@ function renderCampaignCard(camp) {
   const pBName = camp.productB ? camp.productB.name : 'Product B';
   const typeText = (camp.type || 'cross_sell').replace(/_/g, '-').toUpperCase();
   const segmentText = (camp.targetSegment || 'all').toUpperCase();
+
+  // Workflow Control Buttons based strictly on backend state
+  let actionButtonsHtml = '';
+  if (rawStatus === 'draft') {
+    actionButtonsHtml = `
+      <button class="btn btn-primary" type="button" onclick="openSubmitModal(${camp.id})">
+        <span>Submit for Approval</span>
+      </button>
+    `;
+  } else if (rawStatus === 'pending_approval') {
+    actionButtonsHtml = `
+      <button class="btn btn-success" type="button" onclick="openApproveModal(${camp.id})">
+        <span>Approve</span>
+      </button>
+      <button class="btn btn-danger" type="button" onclick="openRejectModal(${camp.id})">
+        <span>Reject</span>
+      </button>
+    `;
+  } else if (rawStatus === 'approved') {
+    actionButtonsHtml = `
+      <span class="approved-banner">✓ Approved</span>
+    `;
+  } else if (rawStatus === 'rejected') {
+    actionButtonsHtml = `
+      <button class="btn btn-secondary" type="button" onclick="openResetModal(${camp.id})">
+        <span>Reset to Draft</span>
+      </button>
+    `;
+  } else if (rawStatus === 'completed' || rawStatus === 'executed') {
+    actionButtonsHtml = `
+      <span class="completed-banner">✓ Completed</span>
+    `;
+  }
 
   card.innerHTML = `
     <div class="campaign-top-row">
@@ -391,9 +427,244 @@ function renderCampaignCard(camp) {
         <span class="campaign-metric-value">${formatDate(camp.createdAt)}</span>
       </div>
     </div>
+
+    <div class="campaign-actions-row">
+      ${actionButtonsHtml}
+      <button class="btn btn-outline" type="button" onclick="openAuditModal(${camp.id})">
+        <span>View Audit</span>
+      </button>
+    </div>
   `;
 
   return card;
+}
+
+// ─── Workflow Confirmation & Rejection Modals ───
+let activeWorkflowAction = null;
+
+function openSubmitModal(campaignId) {
+  openWorkflowModal({
+    title: 'Submit Campaign?',
+    message: 'Are you sure you want to submit this campaign for merchant approval?',
+    confirmText: 'Submit',
+    confirmClass: 'btn-primary',
+    showReasonInput: false,
+    onConfirm: () => handleWorkflowAction(campaignId, 'submit'),
+  });
+}
+
+function openApproveModal(campaignId) {
+  openWorkflowModal({
+    title: 'Approve Campaign?',
+    message: 'This will mark the campaign as approved. It will NOT execute the campaign or create any payment.',
+    confirmText: 'Approve Campaign',
+    confirmClass: 'btn-success',
+    showReasonInput: false,
+    onConfirm: () => handleWorkflowAction(campaignId, 'approve'),
+  });
+}
+
+function openRejectModal(campaignId) {
+  openWorkflowModal({
+    title: 'Reject Campaign',
+    message: 'Specify an optional reason for rejecting this campaign:',
+    confirmText: 'Reject Campaign',
+    confirmClass: 'btn-danger',
+    showReasonInput: true,
+    onConfirm: (reason) => handleWorkflowAction(campaignId, 'reject', { reason }),
+  });
+}
+
+function openResetModal(campaignId) {
+  openWorkflowModal({
+    title: 'Reset Campaign?',
+    message: 'This will move the rejected campaign back to draft.',
+    confirmText: 'Reset to Draft',
+    confirmClass: 'btn-secondary',
+    showReasonInput: false,
+    onConfirm: () => handleWorkflowAction(campaignId, 'reset'),
+  });
+}
+
+function openWorkflowModal({ title, message, confirmText, confirmClass, showReasonInput, onConfirm }) {
+  const overlay = document.getElementById('workflow-modal-overlay');
+  const titleEl = document.getElementById('modal-title');
+  const msgEl = document.getElementById('modal-message');
+  const inputContainer = document.getElementById('modal-input-container');
+  const reasonInput = document.getElementById('reject-reason-input');
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+
+  if (!overlay || !titleEl || !msgEl || !confirmBtn) return;
+
+  titleEl.textContent = title;
+  msgEl.textContent = message;
+  confirmBtn.textContent = confirmText;
+  confirmBtn.className = `btn ${confirmClass}`;
+
+  if (showReasonInput) {
+    inputContainer.classList.remove('hidden');
+    reasonInput.value = '';
+  } else {
+    inputContainer.classList.add('hidden');
+  }
+
+  activeWorkflowAction = () => {
+    const reason = showReasonInput ? reasonInput.value : null;
+    onConfirm(reason);
+  };
+
+  confirmBtn.onclick = activeWorkflowAction;
+  overlay.classList.remove('hidden');
+}
+
+function closeWorkflowModal() {
+  const overlay = document.getElementById('workflow-modal-overlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+  }
+  activeWorkflowAction = null;
+}
+
+// Execute Workflow API Call (Submit / Approve / Reject / Reset)
+async function handleWorkflowAction(campaignId, action, payload = null) {
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = `${action.charAt(0).toUpperCase() + action.slice(1)}ing...`;
+  }
+
+  try {
+    const response = await fetch(`/api/campaigns/${campaignId}/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload ? JSON.stringify(payload) : JSON.stringify({}),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errMsg = data.error || data.message || `Failed to ${action} campaign.`;
+      showToast(errMsg, 'error');
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+      }
+      return;
+    }
+
+    closeWorkflowModal();
+
+    // Show appropriate success notification
+    let toastMessage = 'Action completed successfully.';
+    if (action === 'submit') toastMessage = '✓ Campaign submitted for approval';
+    if (action === 'approve') toastMessage = '✓ Campaign approved successfully';
+    if (action === 'reject') toastMessage = '✓ Campaign rejected';
+    if (action === 'reset') toastMessage = '✓ Campaign reset to draft';
+
+    showToast(toastMessage, 'success');
+
+    // Refresh campaigns list from backend (Backend is source of truth)
+    loadCampaigns();
+  } catch (error) {
+    console.error(`Error performing ${action} on campaign ${campaignId}:`, error);
+    showToast(`Error: ${error.message}`, 'error');
+  } finally {
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+    }
+  }
+}
+
+// ─── Audit Trail Modal ───
+async function openAuditModal(campaignId) {
+  const overlay = document.getElementById('audit-modal-overlay');
+  const container = document.getElementById('audit-timeline-container');
+  const titleEl = document.getElementById('audit-modal-title');
+
+  if (!overlay || !container) return;
+
+  titleEl.textContent = `Campaign #${campaignId} Audit Trail`;
+  container.innerHTML = '<div class="loading-state">Loading audit events...</div>';
+  overlay.classList.remove('hidden');
+
+  try {
+    const response = await fetch(`/api/campaigns/${campaignId}/audit`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const auditLogs = await response.json();
+    container.innerHTML = '';
+
+    if (!Array.isArray(auditLogs) || auditLogs.length === 0) {
+      container.innerHTML = '<div class="empty-state">No audit events recorded yet for this campaign.</div>';
+      return;
+    }
+
+    auditLogs.forEach((log) => {
+      const item = document.createElement('div');
+      item.className = 'audit-item';
+
+      let actionLabel = log.action.replace(/_/g, ' ').toUpperCase();
+      let icon = '📝';
+      if (log.action === 'campaign_submitted') icon = '📤';
+      if (log.action === 'campaign_approved') icon = '✅';
+      if (log.action === 'campaign_rejected') icon = '❌';
+      if (log.action === 'campaign_reset') icon = '🔄';
+
+      const actorLabel = (log.actor || 'merchant').toUpperCase();
+      const reasonText = log.details && log.details.reason ? log.details.reason : null;
+
+      item.innerHTML = `
+        <div class="audit-icon">${icon}</div>
+        <div class="audit-content">
+          <span class="audit-action">${escapeHtml(actionLabel)}</span>
+          <div class="audit-meta">
+            <span>Actor: <strong>${escapeHtml(actorLabel)}</strong></span>
+            <span>Date: ${formatDate(log.createdAt)}</span>
+          </div>
+          ${reasonText ? `<div class="audit-reason">Reason: "${escapeHtml(reasonText)}"</div>` : ''}
+        </div>
+      `;
+
+      container.appendChild(item);
+    });
+  } catch (error) {
+    console.error(`Error loading audit trail for campaign ${campaignId}:`, error);
+    container.innerHTML = '<div class="error-state">Unable to load campaign audit history.</div>';
+  }
+}
+
+function closeAuditModal() {
+  const overlay = document.getElementById('audit-modal-overlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+  }
+}
+
+// ─── Toast Notifications ───
+function showToast(message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+
+  let icon = 'ℹ️';
+  if (type === 'success') icon = '✓';
+  if (type === 'error') icon = '⚠️';
+
+  toast.innerHTML = `
+    <span>${icon}</span>
+    <span>${escapeHtml(message)}</span>
+  `;
+
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast);
+    }
+  }, 4000);
 }
 
 // Helper to escape HTML and prevent XSS
@@ -406,4 +677,5 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
 
