@@ -10,9 +10,11 @@ document.addEventListener('DOMContentLoaded', () => {
 function initDashboard() {
   loadDashboard();
   loadGrowthOpportunities();
+  loadCampaigns();
   loadTopProducts();
   loadRecentOrders();
 }
+
 
 // Utility: Format currency in INR
 function formatCurrency(amount) {
@@ -290,6 +292,110 @@ async function loadRecentOrders() {
   }
 }
 
+// 3. Load Merchant Growth Campaigns
+async function loadCampaigns() {
+  const container = document.getElementById('campaigns-container');
+  if (!container) return;
+
+  try {
+    const response = await fetch('/api/campaigns');
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const campaigns = await response.json();
+    container.innerHTML = '';
+
+    if (!Array.isArray(campaigns) || campaigns.length === 0) {
+      container.innerHTML = '<div class="empty-state">No campaigns created yet.</div>';
+      return;
+    }
+
+    campaigns.forEach((camp) => {
+      const card = renderCampaignCard(camp);
+      container.appendChild(card);
+    });
+  } catch (error) {
+    console.error('Error loading campaigns:', error);
+    if (container) {
+      container.innerHTML = '<div class="error-state">Unable to load campaigns. Please try again.</div>';
+    }
+  }
+}
+
+// Render individual campaign card
+function renderCampaignCard(camp) {
+  const card = document.createElement('div');
+  card.className = 'campaign-card';
+
+  // Human-friendly status badge mapping
+  let statusText = 'DRAFT';
+  let statusClass = 'status-draft';
+
+  const rawStatus = (camp.status || '').toLowerCase();
+  if (rawStatus === 'draft') {
+    statusText = 'DRAFT';
+    statusClass = 'status-draft';
+  } else if (rawStatus === 'pending_approval') {
+    statusText = 'PENDING APPROVAL';
+    statusClass = 'status-pending_approval';
+  } else if (rawStatus === 'approved') {
+    statusText = 'APPROVED';
+    statusClass = 'status-approved';
+  } else if (rawStatus === 'rejected') {
+    statusText = 'REJECTED';
+    statusClass = 'status-rejected';
+  } else {
+    statusText = rawStatus.toUpperCase().replace(/_/g, ' ');
+    statusClass = `status-${rawStatus}`;
+  }
+
+  // Product A and Product B names
+  const pAName = camp.productA ? camp.productA.name : 'Product A';
+  const pBName = camp.productB ? camp.productB.name : 'Product B';
+  const typeText = (camp.type || 'cross_sell').replace(/_/g, '-').toUpperCase();
+  const segmentText = (camp.targetSegment || 'all').toUpperCase();
+
+  card.innerHTML = `
+    <div class="campaign-top-row">
+      <h3 class="campaign-title">${escapeHtml(camp.title || '')}</h3>
+      <span class="badge-status ${statusClass}">${escapeHtml(statusText)}</span>
+    </div>
+
+    <div class="campaign-relation">
+      <span>${escapeHtml(pAName)}</span>
+      <span>→</span>
+      <span>${escapeHtml(pBName)}</span>
+    </div>
+
+    <div class="campaign-meta-row">
+      <span class="badge-type">${escapeHtml(typeText)}</span>
+      <span class="badge-segment">Segment: ${escapeHtml(segmentText)}</span>
+    </div>
+
+    <div class="campaign-metrics-grid">
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Discount</span>
+        <span class="campaign-metric-value">${camp.discountPercent}%</span>
+      </div>
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Budget Limit</span>
+        <span class="campaign-metric-value">${formatCurrency(camp.budgetLimit)}</span>
+      </div>
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Estimated Opportunity</span>
+        <span class="campaign-metric-value highlight">${formatCurrency(camp.estimatedRevenueOpportunity)}</span>
+      </div>
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Created Date</span>
+        <span class="campaign-metric-value">${formatDate(camp.createdAt)}</span>
+      </div>
+    </div>
+  `;
+
+  return card;
+}
+
 // Helper to escape HTML and prevent XSS
 function escapeHtml(str) {
   if (!str) return '';
@@ -300,3 +406,4 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
