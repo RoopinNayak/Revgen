@@ -667,34 +667,208 @@ async function openDetailsModal(campaignId) {
 
   if (!overlay || !bodyContainer || !footerContainer) return;
 
-  titleEl.textContent = `Campaign #${campaignId} Details & Analytics Evidence`;
-  bodyContainer.innerHTML = '<div class="loading-state">Loading campaign details & analytics evidence...</div>';
+  if (titleEl) {
+    titleEl.textContent = `Campaign #${campaignId} Details & AI Growth Pipeline Trace`;
+  }
+  bodyContainer.innerHTML = '<div class="loading-state">Loading AI Growth Pipeline trace...</div>';
   overlay.classList.remove('hidden');
 
   try {
-    const response = await fetch(`/api/campaigns/${campaignId}/details`);
+    const response = await fetch(`/api/agent/pipeline/${campaignId}`);
     if (!response.ok) {
-      throw new Error(`HTTP error! Status: ${response.status}`);
+      throw new Error(`Server returned HTTP ${response.status}`);
     }
 
     const data = await response.json();
-    const camp = data.campaign;
-    const ev = data.evidence;
-    const exp = data.explanation;
+    const camp = data.campaign || {};
+    const ev = data.opportunity || {};
+    const agentAnalysis = data.agentAnalysis || {};
+    const exp = data.explanation || {};
     const gr = data.guardrails || {};
 
-    if (!camp) {
-      bodyContainer.innerHTML = '<div class="error-state">Unable to load campaign details.</div>';
-      return;
+    const pAName = camp.productA ? camp.productA.name : (ev.productA ? ev.productA.name : 'Product A');
+    const pBName = camp.productB ? camp.productB.name : (ev.productB ? ev.productB.name : 'Product B');
+    const rawStatus = (camp.status || 'draft').toLowerCase();
+
+    const statusMap = {
+      draft: 'DRAFT',
+      pending_approval: 'PENDING APPROVAL',
+      approved: 'APPROVED',
+      rejected: 'REJECTED',
+      completed: 'COMPLETED',
+    };
+
+    const statusText = statusMap[rawStatus] || rawStatus.toUpperCase();
+    const statusClass = `status-${rawStatus}`;
+
+    const priorityClass =
+      ev.priority === 'HIGH'
+        ? 'priority-high'
+        : ev.priority === 'MEDIUM'
+        ? 'priority-medium'
+        : 'priority-low';
+
+    // 1. Render Pipeline Stepper Progress
+    const isApproved = rawStatus === 'approved';
+    const isPending = rawStatus === 'pending_approval';
+    const isRejected = rawStatus === 'rejected';
+
+    const pipelineStepperHtml = `
+      <div class="details-section-title">⚡ AI Growth Decision Pipeline Trace</div>
+      <div class="pipeline-stepper" style="background: rgba(0,0,0,0.2); padding: var(--spacing-sm); border-radius: var(--radius-md); margin-bottom: var(--spacing-sm);">
+        <div class="pipeline-step active">
+          <div class="step-badge">1</div>
+          <div class="step-title">Opportunity</div>
+          <div class="step-desc">${escapeHtml(pAName)} → ${escapeHtml(pBName)}</div>
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step active">
+          <div class="step-badge">2</div>
+          <div class="step-title">Growth Agent</div>
+          <div class="step-desc">Analyzed</div>
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step active">
+          <div class="step-badge">3</div>
+          <div class="step-title">Recommendation</div>
+          <div class="step-desc">${camp.discountPercent}% / ${formatCurrency(camp.budgetLimit)}</div>
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step active">
+          <div class="step-badge">4</div>
+          <div class="step-title">Draft Created</div>
+          <div class="step-desc">Campaign #${camp.id}</div>
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step ${isApproved ? 'active' : (isPending ? 'active' : (isRejected ? 'active' : ''))}">
+          <div class="step-badge">5</div>
+          <div class="step-title">Merchant Review</div>
+          <div class="step-desc">${escapeHtml(statusText)}</div>
+        </div>
+        <span class="pipeline-arrow">→</span>
+        <div class="pipeline-step disabled">
+          <div class="step-badge">6</div>
+          <div class="step-title">Execution</div>
+          <div class="step-desc">${isApproved ? 'Ready (Disabled in MVP)' : 'Awaiting Approval'}</div>
+        </div>
+      </div>
+    `;
+
+    // 2. Render AI Agent Decision Summary Block
+    let agentSummaryHtml = '';
+    if (agentAnalysis && agentAnalysis.reasoning) {
+      agentSummaryHtml = `
+        <div class="details-section-title">🤖 AI Growth Agent Decision Summary</div>
+        <div class="details-block" style="background: rgba(99, 102, 241, 0.08); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); border-left: 3px solid var(--accent-light);">
+          <span class="details-label">Agent Reasoning</span>
+          <p class="details-text">${escapeHtml(agentAnalysis.reasoning)}</p>
+        </div>
+        ${agentAnalysis.recommendedAction ? `
+          <div class="details-block" style="margin-top: 6px;">
+            <span class="details-label">Recommended Action Strategy</span>
+            <p class="details-text">${escapeHtml(agentAnalysis.recommendedAction)}</p>
+          </div>
+        ` : ''}
+        ${agentAnalysis.confidenceSummary ? `
+          <div class="details-block" style="margin-top: 6px;">
+            <span class="details-label">Conversion Confidence Summary</span>
+            <p class="details-text">${escapeHtml(agentAnalysis.confidenceSummary)}</p>
+          </div>
+        ` : ''}
+      `;
     }
 
-    const pAName = camp.productA ? camp.productA.name : 'Product A';
-    const pBName = camp.productB ? camp.productB.name : 'Product B';
-    const rawStatus = (camp.status || '').toLowerCase();
+    // 3. Render Analytics Evidence Block
+    let evidenceHtml = '';
+    if (ev.confidence !== undefined) {
+      evidenceHtml = `
+        <div class="details-section-title">Analytics Evidence &amp; Visualizer</div>
+        <div class="evidence-flow-visualizer">
+          <div class="flow-step">
+            <div class="flow-step-icon">📦</div>
+            <span class="flow-label">Trigger Product A</span>
+            <span class="flow-val">${escapeHtml(pAName)}</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">
+            <div class="flow-step-icon">🛒</div>
+            <span class="flow-label">Orders with A</span>
+            <span class="flow-val">${formatNumber(ev.ordersWithA)}</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">
+            <div class="flow-step-icon">🤝</div>
+            <span class="flow-label">Bought Together</span>
+            <span class="flow-val">${formatNumber(ev.ordersWithBoth)}</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">
+            <div class="flow-step-icon">🎯</div>
+            <span class="flow-label">Missed Opportunity</span>
+            <span class="flow-val">${formatNumber(ev.missedCustomers)}</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">
+            <div class="flow-step-icon">✨</div>
+            <span class="flow-label">Target Product B</span>
+            <span class="flow-val">${escapeHtml(pBName)}</span>
+          </div>
+        </div>
 
-    // Render Status Badges & Metadata
-    let statusText = rawStatus.toUpperCase().replace(/_/g, ' ');
-    let statusClass = `status-${rawStatus}`;
+        <div class="opp-metrics-grid" style="margin-top: var(--spacing-sm);">
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Confidence</span>
+            <span class="opp-metric-value">${formatPercent(ev.confidence)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Lift</span>
+            <span class="opp-metric-value">${formatLift(ev.lift)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Orders Together</span>
+            <span class="opp-metric-value">${formatNumber(ev.ordersWithBoth)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Missed Customers</span>
+            <span class="opp-metric-value">${formatNumber(ev.missedCustomers)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Opportunity Score</span>
+            <span class="opp-metric-value">${(ev.opportunityScore || 0).toFixed(1)} / 100</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Priority</span>
+            <span class="opp-metric-value"><span class="badge-priority ${priorityClass}">${escapeHtml(ev.priority)}</span></span>
+          </div>
+        </div>
+      `;
+    }
+
+    // 4. Render Guardrails Block
+    const guardrailsHtml = `
+      <div class="details-section-title">Safety &amp; Guardrails</div>
+      <div class="guardrails-box">
+        <div class="guardrails-grid">
+          <div class="guardrail-item">
+            <span class="guardrail-label">Max Discount Bound</span>
+            <span class="guardrail-val">${gr.maxDiscountPercent || 20}%</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-label">Max Budget Bound</span>
+            <span class="guardrail-val">${formatCurrency(gr.maxBudgetLimit || 5000)}</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-label">Merchant Approval</span>
+            <span class="guardrail-status">✓ REQUIRED</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-label">Auto Execution</span>
+            <span class="guardrail-val" style="color: var(--error);">DISABLED</span>
+          </div>
+        </div>
+        <p class="safety-note">🛡️ Approval only changes campaign status. Execution is disabled in MVP and requires controlled integration.</p>
+      </div>
+    `;
 
     // Workflow actions inside details modal footer
     let actionButtonsHtml = '';
@@ -733,141 +907,21 @@ async function openDetailsModal(campaignId) {
       <button class="btn btn-secondary" type="button" onclick="closeDetailsModal()">Close</button>
     `;
 
-    // Render Evidence Block
-    let evidenceHtml = '';
-    if (ev) {
-      const priorityClass =
-        ev.priority === 'HIGH'
-          ? 'priority-high'
-          : ev.priority === 'MEDIUM'
-          ? 'priority-medium'
-          : 'priority-low';
-
-      evidenceHtml = `
-        <div class="details-section-title">Analytics Evidence &amp; Purchase Behavior</div>
-        
-        <!-- Evidence Visualizer Flow -->
-        <div class="evidence-flow-visualizer">
-          <div class="flow-step">
-            <div class="flow-step-icon">📦</div>
-            <span class="flow-label">Trigger Product A</span>
-            <span class="flow-val">${escapeHtml(pAName)}</span>
-          </div>
-          <span class="flow-arrow">→</span>
-          <div class="flow-step">
-            <div class="flow-step-icon">🛒</div>
-            <span class="flow-label">Orders with A</span>
-            <span class="flow-val">${formatNumber(ev.ordersWithA)}</span>
-          </div>
-          <span class="flow-arrow">→</span>
-          <div class="flow-step">
-            <div class="flow-step-icon">🤝</div>
-            <span class="flow-label">Bought Together</span>
-            <span class="flow-val">${formatNumber(ev.ordersWithBoth)}</span>
-          </div>
-          <span class="flow-arrow">→</span>
-          <div class="flow-step">
-            <div class="flow-step-icon">🎯</div>
-            <span class="flow-label">Missed Opportunity</span>
-            <span class="flow-val">${formatNumber(ev.missedCustomers)}</span>
-          </div>
-          <span class="flow-arrow">→</span>
-          <div class="flow-step">
-            <div class="flow-step-icon">✨</div>
-            <span class="flow-label">Target Product B</span>
-            <span class="flow-val">${escapeHtml(pBName)}</span>
-          </div>
-        </div>
-
-        <!-- Evidence Metrics Grid -->
-        <div class="opp-metrics-grid" style="margin-top: var(--spacing-sm);">
-          <div class="opp-metric-item">
-            <span class="opp-metric-label">Confidence</span>
-            <span class="opp-metric-value">${formatPercent(ev.confidence)}</span>
-          </div>
-          <div class="opp-metric-item">
-            <span class="opp-metric-label">Lift</span>
-            <span class="opp-metric-value">${formatLift(ev.lift)}</span>
-          </div>
-          <div class="opp-metric-item">
-            <span class="opp-metric-label">Orders Together</span>
-            <span class="opp-metric-value">${formatNumber(ev.ordersWithBoth)}</span>
-          </div>
-          <div class="opp-metric-item">
-            <span class="opp-metric-label">Missed Customers</span>
-            <span class="opp-metric-value">${formatNumber(ev.missedCustomers)}</span>
-          </div>
-          <div class="opp-metric-item">
-            <span class="opp-metric-label">Opportunity Score</span>
-            <span class="opp-metric-value">${(ev.opportunityScore || 0).toFixed(1)} / 100</span>
-          </div>
-          <div class="opp-metric-item">
-            <span class="opp-metric-label">Priority</span>
-            <span class="opp-metric-value"><span class="badge-priority ${priorityClass}">${escapeHtml(ev.priority)}</span></span>
-          </div>
-        </div>
-      `;
-    } else {
-      evidenceHtml = `
-        <div class="details-section-title">Analytics Evidence</div>
-        <div class="empty-state">Analytics evidence is currently unavailable.</div>
-      `;
-    }
-
-    // Render Explanation Block
-    let explanationHtml = '';
-    if (exp) {
-      explanationHtml = `
-        <div class="details-section-title">Recommendation Explanation</div>
-        <div class="details-block">
-          <span class="details-label">Why This Opportunity</span>
-          <p class="details-text">${escapeHtml(exp.reason || '')}</p>
-        </div>
-        <div class="details-block">
-          <span class="details-label">Recommendation Strategy</span>
-          <p class="details-text">${escapeHtml(exp.recommendation || '')}</p>
-        </div>
-        <div class="details-block">
-          <span class="details-label">Estimated Revenue Opportunity</span>
-          <p class="details-text">${escapeHtml(exp.opportunity || '')}</p>
-        </div>
-        <p class="details-disclaimer">${escapeHtml(exp.disclaimer || '')}</p>
-      `;
-    }
-
-    // Render Guardrails Block
-    const guardrailsHtml = `
-      <div class="details-section-title">Safety &amp; Guardrails</div>
-      <div class="guardrails-box">
-        <div class="guardrails-grid">
-          <div class="guardrail-item">
-            <span class="guardrail-label">Max Discount Bound</span>
-            <span class="guardrail-val">${gr.maxDiscountPercent || 20}%</span>
-          </div>
-          <div class="guardrail-item">
-            <span class="guardrail-label">Max Budget Bound</span>
-            <span class="guardrail-val">${formatCurrency(gr.maxBudgetLimit || 5000)}</span>
-          </div>
-          <div class="guardrail-item">
-            <span class="guardrail-label">Merchant Approval</span>
-            <span class="guardrail-status">✓ REQUIRED</span>
-          </div>
-          <div class="guardrail-item">
-            <span class="guardrail-label">Auto Execution</span>
-            <span class="guardrail-val" style="color: var(--error);">DISABLED</span>
-          </div>
-        </div>
-        <p class="safety-note">🛡️ Approval only changes campaign status. It does not execute the campaign or create a payment.</p>
-      </div>
-    `;
-
     bodyContainer.innerHTML = `
+      ${pipelineStepperHtml}
+
       <!-- Campaign Configuration Section -->
       <div class="details-section-title">Campaign Configuration</div>
       <div class="campaign-top-row">
         <h3 class="campaign-title">${escapeHtml(camp.title || '')}</h3>
         <span class="badge-status ${statusClass}">${escapeHtml(statusText)}</span>
       </div>
+
+      ${isApproved ? `
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: 8px; font-size: 0.85rem; color: #34d399; font-weight: 600;">
+          ✓ APPROVED — Ready for Execution (Execution Disabled in MVP)
+        </div>
+      ` : ''}
 
       <div class="campaign-relation">
         <span>${escapeHtml(pAName)}</span>
@@ -899,8 +953,8 @@ async function openDetailsModal(campaignId) {
         </div>
       </div>
 
+      ${agentSummaryHtml}
       ${evidenceHtml}
-      ${explanationHtml}
       ${guardrailsHtml}
     `;
   } catch (error) {

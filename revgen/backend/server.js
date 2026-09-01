@@ -642,6 +642,84 @@ app.get('/api/agent/growth-recommendation-preview', async (req, res) => {
   }
 });
 
+// 21. GET /api/agent/pipeline/:campaignId — Read-only AI Growth Pipeline state trace
+app.get('/api/agent/pipeline/:campaignId', async (req, res) => {
+  try {
+    const campaignId = req.params.campaignId;
+    const campaign = await getCampaignById(campaignId);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found.' });
+    }
+
+    const auditLogs = await getCampaignAuditLogs(campaignId);
+
+    // Fetch opportunity analytics to produce agent reasoning & recommendation trace
+    let opportunity = null;
+    let agentResult = null;
+    let recommendationResult = null;
+
+    try {
+      const pairAnalytics = await getProductPairAnalytics({
+        minOrdersWithBoth: 1,
+        minConfidence: 0.01,
+        minLift: 1.0,
+        limit: 100,
+      });
+      const scored = scoreOpportunities(pairAnalytics);
+      const explained = explainOpportunities(scored);
+
+      const match = explained.find(
+        (o) => o.productA.id === campaign.productAId && o.productB.id === campaign.productBId
+      );
+
+      if (match) {
+        opportunity = match;
+      } else if (explained.length > 0) {
+        opportunity = explained[0];
+      }
+    } catch (err) {
+      console.warn('Pipeline opportunity lookup note:', err.message);
+    }
+
+    if (opportunity) {
+      try {
+        agentResult = runGrowthAgent(opportunity);
+        recommendationResult = generateGrowthRecommendation(opportunity);
+      } catch (err) {
+        console.warn('Pipeline agent execution note:', err.message);
+      }
+    }
+
+    res.json({
+      campaign,
+      opportunity: opportunity || {
+        productA: campaign.productA,
+        productB: campaign.productB,
+        estimatedRevenueOpportunity: campaign.estimatedRevenueOpportunity,
+      },
+      agentAnalysis: agentResult ? agentResult.analysis : null,
+      recommendation: recommendationResult ? recommendationResult.recommendation : null,
+      workflow: {
+        currentStatus: campaign.status,
+        auditLogs: auditLogs || [],
+      },
+      guardrails: {
+        maxDiscountPercent: 20,
+        maxBudgetLimit: 5000,
+        merchantApprovalRequired: true,
+        autoExecutionAllowed: false,
+      },
+    });
+  } catch (error) {
+    console.error(`Error fetching pipeline for campaign ${req.params.campaignId}:`, error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to fetch AI Growth Pipeline trace.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
@@ -653,10 +731,12 @@ app.listen(PORT, () => {
   console.log(`Recommendation: http://localhost:${PORT}/api/campaigns/recommendation`);
   console.log(`Agent Preview: http://localhost:${PORT}/api/agent/growth-preview`);
   console.log(`Agent Rec Preview: http://localhost:${PORT}/api/agent/growth-recommendation-preview`);
+  console.log(`Agent Pipeline: http://localhost:${PORT}/api/agent/pipeline/:campaignId`);
   console.log(`Campaigns:   http://localhost:${PORT}/api/campaigns`);
   console.log(`Executions:  http://localhost:${PORT}/api/executions`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
+
 
 
 
