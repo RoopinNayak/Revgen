@@ -5,7 +5,18 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   initDashboard();
+
+  // Accessibility: Allow Escape key to close active modals
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeWorkflowModal();
+      closeAuditModal();
+      closeDetailsModal();
+      closeCreateModal();
+    }
+  });
 });
+
 
 function initDashboard() {
   loadDashboard();
@@ -84,6 +95,8 @@ async function loadDashboard() {
 }
 
 // 2. Load Growth Opportunities
+window.loadedOpportunities = [];
+
 async function loadGrowthOpportunities() {
   const container = document.getElementById('opportunities-container');
   if (!container) return;
@@ -95,6 +108,7 @@ async function loadGrowthOpportunities() {
     }
 
     const opportunities = await response.json();
+    window.loadedOpportunities = opportunities;
     container.innerHTML = '';
 
     if (!Array.isArray(opportunities) || opportunities.length === 0) {
@@ -170,10 +184,15 @@ function renderOpportunityCard(opp, index) {
       </div>
     </div>
 
-    <button id="${btnId}" class="btn-details" type="button" aria-expanded="false" onclick="toggleDetailsPanel('${detailsPanelId}', '${btnId}')">
-      <span>View Details</span>
-      <span class="btn-details-arrow">▼</span>
-    </button>
+    <div style="display: flex; gap: var(--spacing-sm);">
+      <button class="btn btn-primary" style="flex: 1;" type="button" onclick="openCreateModalFromOpportunityIndex(${index})">
+        <span>Create Campaign</span>
+      </button>
+      <button id="${btnId}" class="btn-details" style="flex: 1;" type="button" aria-expanded="false" onclick="toggleDetailsPanel('${detailsPanelId}', '${btnId}')">
+        <span>View Details</span>
+        <span class="btn-details-arrow">▼</span>
+      </button>
+    </div>
 
     <div id="${detailsPanelId}" class="opp-details-panel hidden">
       <div class="details-block">
@@ -197,6 +216,7 @@ function renderOpportunityCard(opp, index) {
 
   return card;
 }
+
 
 // Toggle View Details panel open/closed
 function toggleDetailsPanel(panelId, btnId) {
@@ -922,6 +942,251 @@ function showToast(message, type = 'info') {
   }, 4000);
 }
 
+// ─── Create Campaign Draft Modal Handlers ───
+function openCreateModalFromOpportunityIndex(index) {
+  const opp = window.loadedOpportunities && window.loadedOpportunities[index];
+  if (!opp) {
+    showToast('Unable to find opportunity data.', 'error');
+    return;
+  }
+  openCreateModalFromOpportunity(opp);
+}
+
+function openCreateModalFromOpportunity(opp) {
+  const overlay = document.getElementById('create-modal-overlay');
+  const bodyContainer = document.getElementById('create-modal-body');
+  const confirmBtn = document.getElementById('create-confirm-btn');
+
+  if (!overlay || !bodyContainer || !confirmBtn) return;
+
+  const pAName = opp.productA ? opp.productA.name : 'Product A';
+  const pBName = opp.productB ? opp.productB.name : 'Product B';
+  const exp = opp.explanation || {};
+
+  const defaultTitle = exp.title || `Cross-sell ${pBName} to ${pAName} buyers`;
+  const defaultDesc = exp.recommendation || `Offer ${pBName} to customers who previously purchased ${pAName}.`;
+  const defaultSegment = (opp.targetSegment || 'premium').toLowerCase();
+  const defaultDiscount = 10;
+  const defaultBudget = 5000;
+
+  const priorityClass =
+    opp.priority === 'HIGH'
+      ? 'priority-high'
+      : opp.priority === 'MEDIUM'
+      ? 'priority-medium'
+      : 'priority-low';
+
+  bodyContainer.innerHTML = `
+    <!-- Opportunity Evidence Summary -->
+    <div class="details-section-title">Growth Opportunity Context</div>
+    
+    <div class="campaign-relation" style="margin-bottom: var(--spacing-sm);">
+      <span>${escapeHtml(pAName)}</span>
+      <span>→</span>
+      <span>${escapeHtml(pBName)}</span>
+    </div>
+
+    <div class="opp-metrics-grid">
+      <div class="opp-metric-item">
+        <span class="opp-metric-label">Confidence</span>
+        <span class="opp-metric-value">${formatPercent(opp.confidence)}</span>
+      </div>
+      <div class="opp-metric-item">
+        <span class="opp-metric-label">Lift</span>
+        <span class="opp-metric-value">${formatLift(opp.lift)}</span>
+      </div>
+      <div class="opp-metric-item">
+        <span class="opp-metric-label">Missed Customers</span>
+        <span class="opp-metric-value">${formatNumber(opp.missedCustomers)}</span>
+      </div>
+      <div class="opp-metric-item">
+        <span class="opp-metric-label">Opportunity Score</span>
+        <span class="opp-metric-value">${(opp.opportunityScore || 0).toFixed(1)} / 100</span>
+      </div>
+      <div class="opp-metric-item">
+        <span class="opp-metric-label">Priority</span>
+        <span class="opp-metric-value"><span class="badge-priority ${priorityClass}">${escapeHtml(opp.priority)}</span></span>
+      </div>
+      <div class="opp-metric-item">
+        <span class="opp-metric-label">Est. Revenue</span>
+        <span class="opp-metric-value highlight">${formatCurrency(opp.estimatedRevenueOpportunity)}</span>
+      </div>
+    </div>
+
+    <!-- Editable Campaign Configuration Form -->
+    <div class="details-section-title" style="margin-top: var(--spacing-md);">Campaign Configuration (Merchant Review)</div>
+
+    <div class="form-group">
+      <label for="create-title-input" class="form-label">Campaign Title *</label>
+      <input type="text" id="create-title-input" class="form-input" value="${escapeHtml(defaultTitle)}">
+    </div>
+
+    <div class="form-group">
+      <label for="create-desc-input" class="form-label">Description</label>
+      <textarea id="create-desc-input" class="form-textarea">${escapeHtml(defaultDesc)}</textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="create-segment-select" class="form-label">Target Segment</label>
+        <select id="create-segment-select" class="form-select">
+          <option value="premium" ${defaultSegment === 'premium' ? 'selected' : ''}>Premium</option>
+          <option value="regular" ${defaultSegment === 'regular' ? 'selected' : ''}>Regular</option>
+          <option value="budget" ${defaultSegment === 'budget' ? 'selected' : ''}>Budget</option>
+          <option value="all" ${defaultSegment === 'all' ? 'selected' : ''}>All Customers</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="create-discount-input" class="form-label">Discount % (Max 20%) *</label>
+        <input type="number" id="create-discount-input" class="form-input" min="0" max="20" step="1" value="${defaultDiscount}">
+      </div>
+
+      <div class="form-group">
+        <label for="create-budget-input" class="form-label">Budget Limit (₹, Max ₹5,000) *</label>
+        <input type="number" id="create-budget-input" class="form-input" min="0" max="5000" step="100" value="${defaultBudget}">
+      </div>
+    </div>
+
+    <!-- Safety & Guardrails Section -->
+    <div class="details-section-title" style="margin-top: var(--spacing-md);">Campaign Guardrails</div>
+    <div class="guardrails-box">
+      <div class="guardrails-grid">
+        <div class="guardrail-item">
+          <span class="guardrail-label">Max Discount Bound</span>
+          <span class="guardrail-val">20%</span>
+        </div>
+        <div class="guardrail-item">
+          <span class="guardrail-label">Max Budget Bound</span>
+          <span class="guardrail-val">₹5,000</span>
+        </div>
+        <div class="guardrail-item">
+          <span class="guardrail-label">Merchant Approval</span>
+          <span class="guardrail-status">✓ REQUIRED</span>
+        </div>
+        <div class="guardrail-item">
+          <span class="guardrail-label">Auto Execution</span>
+          <span class="guardrail-val" style="color: var(--error);">DISABLED</span>
+        </div>
+      </div>
+      <p class="safety-note">🛡️ This action creates a draft only. The campaign will not be executed or submitted for approval automatically.</p>
+    </div>
+  `;
+
+  confirmBtn.disabled = false;
+  confirmBtn.textContent = 'Create Campaign Draft';
+  confirmBtn.onclick = () => handleCreateCampaignSubmit(opp);
+
+  overlay.classList.remove('hidden');
+}
+
+function closeCreateModal() {
+  const overlay = document.getElementById('create-modal-overlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+  }
+}
+
+async function handleCreateCampaignSubmit(opp) {
+  const titleInput = document.getElementById('create-title-input');
+  const descInput = document.getElementById('create-desc-input');
+  const segmentSelect = document.getElementById('create-segment-select');
+  const discountInput = document.getElementById('create-discount-input');
+  const budgetInput = document.getElementById('create-budget-input');
+  const confirmBtn = document.getElementById('create-confirm-btn');
+
+  if (!titleInput || !discountInput || !budgetInput) return;
+
+  const title = titleInput.value.trim();
+  const description = descInput ? descInput.value.trim() : '';
+  const targetSegment = segmentSelect ? segmentSelect.value : 'all';
+  const discountPercent = parseFloat(discountInput.value);
+  const budgetLimit = parseFloat(budgetInput.value);
+
+  // Frontend Validation
+  if (!title) {
+    showToast('Campaign title is required.', 'error');
+    titleInput.focus();
+    return;
+  }
+
+  if (isNaN(discountPercent) || discountPercent < 0 || discountPercent > 20) {
+    showToast('Discount percent must be a number between 0 and 20%.', 'error');
+    discountInput.focus();
+    return;
+  }
+
+  if (isNaN(budgetLimit) || budgetLimit < 0 || budgetLimit > 5000) {
+    showToast('Budget limit must be a number between ₹0 and ₹5,000.', 'error');
+    budgetInput.focus();
+    return;
+  }
+
+  const validSegments = ['budget', 'regular', 'premium', 'all'];
+  if (!validSegments.includes(targetSegment)) {
+    showToast('Invalid target segment selected.', 'error');
+    return;
+  }
+
+  const payload = {
+    productAId: opp.productA.id,
+    productBId: opp.productB.id,
+    type: 'cross_sell',
+    targetSegment: targetSegment,
+    discountPercent: discountPercent,
+    budgetLimit: budgetLimit,
+    title: title,
+    description: description,
+    estimatedRevenueOpportunity: opp.estimatedRevenueOpportunity,
+    targetCount: opp.missedCustomers || 0,
+  };
+
+  // Prevent duplicate submission
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Creating Draft...';
+  }
+
+  try {
+    const response = await fetch('/api/campaigns', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errMsg = data.error || data.message || 'Unable to create campaign draft.';
+      showToast(errMsg, 'error');
+      if (confirmBtn) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Create Campaign Draft';
+      }
+      return;
+    }
+
+    closeCreateModal();
+    showToast('✓ Campaign draft created successfully', 'success');
+
+    // Refresh campaigns list (Backend is source of truth)
+    await loadCampaigns();
+
+    // Automatically open details modal for newly created campaign
+    if (data && data.id) {
+      openDetailsModal(data.id);
+    }
+  } catch (error) {
+    console.error('Error creating campaign draft:', error);
+    showToast(`Error: ${error.message}`, 'error');
+  } finally {
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Create Campaign Draft';
+    }
+  }
+}
+
 // Helper to escape HTML and prevent XSS
 function escapeHtml(str) {
   if (!str) return '';
@@ -932,6 +1197,7 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
 
 
 

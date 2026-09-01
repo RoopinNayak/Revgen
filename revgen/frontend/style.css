@@ -979,9 +979,46 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-  max-height: 65vh;
+  max-height: 75vh;
   overflow-y: auto;
 }
+
+/* Accessibility Focus States */
+.btn:focus-visible,
+.form-input:focus-visible,
+.form-select:focus-visible,
+.form-textarea:focus-visible,
+.modal-close-btn:focus-visible {
+  outline: 2px solid var(--accent-light);
+  outline-offset: 2px;
+}
+
+/* Responsive Media Queries for Modals & Cards */
+@media (max-width: 640px) {
+  .modal-card {
+    max-width: 95vw;
+    margin: 10px;
+  }
+  
+  .modal-body {
+    padding: var(--spacing-md);
+    max-height: 80vh;
+  }
+
+  .campaign-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .campaign-actions-row .btn {
+    width: 100%;
+  }
+
+  .evidence-flow-visualizer {
+    padding: var(--spacing-sm);
+  }
+}
+
 
 .modal-message {
   font-size: 0.925rem;
@@ -1021,6 +1058,58 @@ body {
   border-color: var(--accent-light);
   box-shadow: 0 0 0 2px var(--accent-glow);
 }
+
+/* Form Controls & Layout */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.875rem;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  outline: none;
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  width: 100%;
+}
+
+.form-select option {
+  background: #111827;
+  color: var(--text-primary);
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: var(--accent-light);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
 
 .modal-footer {
   padding: var(--spacing-md) var(--spacing-lg);

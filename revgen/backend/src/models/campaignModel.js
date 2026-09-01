@@ -103,11 +103,12 @@ async function validateCampaignCreation(data) {
     throw new Error('discountPercent must be a number between 0 and 20.');
   }
 
-  // 7. Budget limit validation
+  // 7. Budget limit validation (Business Safety Constraint: 0 to ₹5,000)
   const budget = parseFloat(budgetLimit);
-  if (isNaN(budget) || budget < 0) {
-    throw new Error('budgetLimit must be a non-negative number.');
+  if (isNaN(budget) || budget < 0 || budget > 5000) {
+    throw new Error('budgetLimit must be a number between 0 and 5000.');
   }
+
 
   // 8. Estimated revenue opportunity validation
   const estRev = parseFloat(estimatedRevenueOpportunity);

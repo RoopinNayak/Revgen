@@ -202,6 +202,24 @@
     </div>
   </div>
 
+  <!-- Campaign Creation Modal -->
+  <div id="create-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <h3 class="modal-title">Create Campaign Draft from Recommendation</h3>
+        <button class="modal-close-btn" type="button" onclick="closeCreateModal()">&times;</button>
+      </div>
+      <div id="create-modal-body" class="modal-body">
+        <!-- Dynamically populated opportunity context & form -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" type="button" onclick="closeCreateModal()">Cancel</button>
+        <button id="create-confirm-btn" class="btn btn-primary" type="button">Create Campaign Draft</button>
+      </div>
+    </div>
+  </div>
+
+
 
   <script src="app.js"></script>
 </body>
