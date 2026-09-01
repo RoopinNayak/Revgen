@@ -32,6 +32,8 @@ const {
   getExecutionByCampaignId,
   getAllExecutions,
 } = require('./src/models/campaignExecutionModel');
+const { runGrowthAgent } = require('./src/agents/growthAgent');
+
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -554,6 +556,48 @@ app.get('/api/executions', async (req, res) => {
   }
 });
 
+// 19. GET /api/agent/growth-preview — Read-only AI Growth Agent preview analysis
+app.get('/api/agent/growth-preview', async (req, res) => {
+  try {
+    const pairAnalytics = await getProductPairAnalytics({
+      minOrdersWithBoth: 1,
+      minConfidence: 0.01,
+      minLift: 1.0,
+      limit: 100,
+    });
+
+    const scored = scoreOpportunities(pairAnalytics);
+    const explained = explainOpportunities(scored);
+
+    if (!explained || explained.length === 0) {
+      return res.status(404).json({
+        error: 'No growth opportunities available for agent analysis preview.',
+      });
+    }
+
+    // Optional query parameter filtering by productAId & productBId
+    let selectedOpp = explained[0];
+    const pAId = parseInt(req.query.productAId, 10);
+    const pBId = parseInt(req.query.productBId, 10);
+
+    if (!isNaN(pAId) && !isNaN(pBId)) {
+      const match = explained.find((o) => o.productA.id === pAId && o.productB.id === pBId);
+      if (match) {
+        selectedOpp = match;
+      }
+    }
+
+    const agentResult = runGrowthAgent(selectedOpp);
+    res.json(agentResult);
+  } catch (error) {
+    console.error('Error running AI Growth Agent preview:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to generate Growth Agent preview analysis.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
@@ -563,10 +607,12 @@ app.listen(PORT, () => {
   console.log(`Opportunities: http://localhost:${PORT}/api/analytics/opportunities`);
   console.log(`Explained:   http://localhost:${PORT}/api/analytics/opportunities/explained`);
   console.log(`Recommendation: http://localhost:${PORT}/api/campaigns/recommendation`);
+  console.log(`Agent Preview: http://localhost:${PORT}/api/agent/growth-preview`);
   console.log(`Campaigns:   http://localhost:${PORT}/api/campaigns`);
   console.log(`Executions:  http://localhost:${PORT}/api/executions`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
+
 
 
 
