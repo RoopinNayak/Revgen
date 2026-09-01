@@ -429,6 +429,9 @@ function renderCampaignCard(camp) {
     </div>
 
     <div class="campaign-actions-row">
+      <button class="btn btn-outline" type="button" onclick="openDetailsModal(${camp.id})">
+        <span>View Details</span>
+      </button>
       ${actionButtonsHtml}
       <button class="btn btn-outline" type="button" onclick="openAuditModal(${camp.id})">
         <span>View Audit</span>
@@ -438,6 +441,7 @@ function renderCampaignCard(camp) {
 
   return card;
 }
+
 
 // ─── Workflow Confirmation & Rejection Modals ───
 let activeWorkflowAction = null;
@@ -634,8 +638,259 @@ async function openAuditModal(campaignId) {
   }
 }
 
-function closeAuditModal() {
-  const overlay = document.getElementById('audit-modal-overlay');
+// ─── Campaign Details & Analytics Evidence Modal ───
+async function openDetailsModal(campaignId) {
+  const overlay = document.getElementById('details-modal-overlay');
+  const bodyContainer = document.getElementById('details-modal-body');
+  const footerContainer = document.getElementById('details-modal-footer');
+  const titleEl = document.getElementById('details-modal-title');
+
+  if (!overlay || !bodyContainer || !footerContainer) return;
+
+  titleEl.textContent = `Campaign #${campaignId} Details & Analytics Evidence`;
+  bodyContainer.innerHTML = '<div class="loading-state">Loading campaign details & analytics evidence...</div>';
+  overlay.classList.remove('hidden');
+
+  try {
+    const response = await fetch(`/api/campaigns/${campaignId}/details`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const camp = data.campaign;
+    const ev = data.evidence;
+    const exp = data.explanation;
+    const gr = data.guardrails || {};
+
+    if (!camp) {
+      bodyContainer.innerHTML = '<div class="error-state">Unable to load campaign details.</div>';
+      return;
+    }
+
+    const pAName = camp.productA ? camp.productA.name : 'Product A';
+    const pBName = camp.productB ? camp.productB.name : 'Product B';
+    const rawStatus = (camp.status || '').toLowerCase();
+
+    // Render Status Badges & Metadata
+    let statusText = rawStatus.toUpperCase().replace(/_/g, ' ');
+    let statusClass = `status-${rawStatus}`;
+
+    // Workflow actions inside details modal footer
+    let actionButtonsHtml = '';
+    if (rawStatus === 'draft') {
+      actionButtonsHtml = `
+        <button class="btn btn-primary" type="button" onclick="closeDetailsModal(); openSubmitModal(${camp.id});">
+          <span>Submit for Approval</span>
+        </button>
+      `;
+    } else if (rawStatus === 'pending_approval') {
+      actionButtonsHtml = `
+        <button class="btn btn-success" type="button" onclick="closeDetailsModal(); openApproveModal(${camp.id});">
+          <span>Approve</span>
+        </button>
+        <button class="btn btn-danger" type="button" onclick="closeDetailsModal(); openRejectModal(${camp.id});">
+          <span>Reject</span>
+        </button>
+      `;
+    } else if (rawStatus === 'approved') {
+      actionButtonsHtml = `<span class="approved-banner">✓ Approved</span>`;
+    } else if (rawStatus === 'rejected') {
+      actionButtonsHtml = `
+        <button class="btn btn-secondary" type="button" onclick="closeDetailsModal(); openResetModal(${camp.id});">
+          <span>Reset to Draft</span>
+        </button>
+      `;
+    } else if (rawStatus === 'completed' || rawStatus === 'executed') {
+      actionButtonsHtml = `<span class="completed-banner">✓ Completed</span>`;
+    }
+
+    footerContainer.innerHTML = `
+      <button class="btn btn-outline" type="button" onclick="closeDetailsModal(); openAuditModal(${camp.id});">
+        <span>View Audit History</span>
+      </button>
+      ${actionButtonsHtml}
+      <button class="btn btn-secondary" type="button" onclick="closeDetailsModal()">Close</button>
+    `;
+
+    // Render Evidence Block
+    let evidenceHtml = '';
+    if (ev) {
+      const priorityClass =
+        ev.priority === 'HIGH'
+          ? 'priority-high'
+          : ev.priority === 'MEDIUM'
+          ? 'priority-medium'
+          : 'priority-low';
+
+      evidenceHtml = `
+        <div class="details-section-title">Analytics Evidence &amp; Purchase Behavior</div>
+        
+        <!-- Evidence Visualizer Flow -->
+        <div class="evidence-flow-visualizer">
+          <div class="flow-step">
+            <div class="flow-step-icon">📦</div>
+            <span class="flow-label">Trigger Product A</span>
+            <span class="flow-val">${escapeHtml(pAName)}</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">
+            <div class="flow-step-icon">🛒</div>
+            <span class="flow-label">Orders with A</span>
+            <span class="flow-val">${formatNumber(ev.ordersWithA)}</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">
+            <div class="flow-step-icon">🤝</div>
+            <span class="flow-label">Bought Together</span>
+            <span class="flow-val">${formatNumber(ev.ordersWithBoth)}</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">
+            <div class="flow-step-icon">🎯</div>
+            <span class="flow-label">Missed Opportunity</span>
+            <span class="flow-val">${formatNumber(ev.missedCustomers)}</span>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-step">
+            <div class="flow-step-icon">✨</div>
+            <span class="flow-label">Target Product B</span>
+            <span class="flow-val">${escapeHtml(pBName)}</span>
+          </div>
+        </div>
+
+        <!-- Evidence Metrics Grid -->
+        <div class="opp-metrics-grid" style="margin-top: var(--spacing-sm);">
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Confidence</span>
+            <span class="opp-metric-value">${formatPercent(ev.confidence)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Lift</span>
+            <span class="opp-metric-value">${formatLift(ev.lift)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Orders Together</span>
+            <span class="opp-metric-value">${formatNumber(ev.ordersWithBoth)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Missed Customers</span>
+            <span class="opp-metric-value">${formatNumber(ev.missedCustomers)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Opportunity Score</span>
+            <span class="opp-metric-value">${(ev.opportunityScore || 0).toFixed(1)} / 100</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Priority</span>
+            <span class="opp-metric-value"><span class="badge-priority ${priorityClass}">${escapeHtml(ev.priority)}</span></span>
+          </div>
+        </div>
+      `;
+    } else {
+      evidenceHtml = `
+        <div class="details-section-title">Analytics Evidence</div>
+        <div class="empty-state">Analytics evidence is currently unavailable.</div>
+      `;
+    }
+
+    // Render Explanation Block
+    let explanationHtml = '';
+    if (exp) {
+      explanationHtml = `
+        <div class="details-section-title">Recommendation Explanation</div>
+        <div class="details-block">
+          <span class="details-label">Why This Opportunity</span>
+          <p class="details-text">${escapeHtml(exp.reason || '')}</p>
+        </div>
+        <div class="details-block">
+          <span class="details-label">Recommendation Strategy</span>
+          <p class="details-text">${escapeHtml(exp.recommendation || '')}</p>
+        </div>
+        <div class="details-block">
+          <span class="details-label">Estimated Revenue Opportunity</span>
+          <p class="details-text">${escapeHtml(exp.opportunity || '')}</p>
+        </div>
+        <p class="details-disclaimer">${escapeHtml(exp.disclaimer || '')}</p>
+      `;
+    }
+
+    // Render Guardrails Block
+    const guardrailsHtml = `
+      <div class="details-section-title">Safety &amp; Guardrails</div>
+      <div class="guardrails-box">
+        <div class="guardrails-grid">
+          <div class="guardrail-item">
+            <span class="guardrail-label">Max Discount Bound</span>
+            <span class="guardrail-val">${gr.maxDiscountPercent || 20}%</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-label">Max Budget Bound</span>
+            <span class="guardrail-val">${formatCurrency(gr.maxBudgetLimit || 5000)}</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-label">Merchant Approval</span>
+            <span class="guardrail-status">✓ REQUIRED</span>
+          </div>
+          <div class="guardrail-item">
+            <span class="guardrail-label">Auto Execution</span>
+            <span class="guardrail-val" style="color: var(--error);">DISABLED</span>
+          </div>
+        </div>
+        <p class="safety-note">🛡️ Approval only changes campaign status. It does not execute the campaign or create a payment.</p>
+      </div>
+    `;
+
+    bodyContainer.innerHTML = `
+      <!-- Campaign Configuration Section -->
+      <div class="details-section-title">Campaign Configuration</div>
+      <div class="campaign-top-row">
+        <h3 class="campaign-title">${escapeHtml(camp.title || '')}</h3>
+        <span class="badge-status ${statusClass}">${escapeHtml(statusText)}</span>
+      </div>
+
+      <div class="campaign-relation">
+        <span>${escapeHtml(pAName)}</span>
+        <span>→</span>
+        <span>${escapeHtml(pBName)}</span>
+      </div>
+
+      <div class="campaign-meta-row">
+        <span class="badge-type">${escapeHtml((camp.type || 'cross_sell').replace(/_/g, '-').toUpperCase())}</span>
+        <span class="badge-segment">Segment: ${escapeHtml((camp.targetSegment || 'all').toUpperCase())}</span>
+      </div>
+
+      <div class="campaign-metrics-grid">
+        <div class="campaign-metric-item">
+          <span class="campaign-metric-label">Discount %</span>
+          <span class="campaign-metric-value">${camp.discountPercent}%</span>
+        </div>
+        <div class="campaign-metric-item">
+          <span class="campaign-metric-label">Budget Limit</span>
+          <span class="campaign-metric-value">${formatCurrency(camp.budgetLimit)}</span>
+        </div>
+        <div class="campaign-metric-item">
+          <span class="campaign-metric-label">Estimated Revenue Opportunity</span>
+          <span class="campaign-metric-value highlight">${formatCurrency(camp.estimatedRevenueOpportunity)}</span>
+        </div>
+        <div class="campaign-metric-item">
+          <span class="campaign-metric-label">Created / Updated</span>
+          <span class="campaign-metric-value">${formatDate(camp.createdAt)}</span>
+        </div>
+      </div>
+
+      ${evidenceHtml}
+      ${explanationHtml}
+      ${guardrailsHtml}
+    `;
+  } catch (error) {
+    console.error(`Error loading details for campaign ${campaignId}:`, error);
+    bodyContainer.innerHTML = '<div class="error-state">Unable to load campaign details. Please try again.</div>';
+  }
+}
+
+function closeDetailsModal() {
+  const overlay = document.getElementById('details-modal-overlay');
   if (overlay) {
     overlay.classList.add('hidden');
   }
@@ -677,5 +932,6 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
 
 

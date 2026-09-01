@@ -359,6 +359,75 @@ app.get('/api/campaigns/:id', async (req, res) => {
   }
 });
 
+// 10b. GET /api/campaigns/:id/details — Fetch campaign details, analytics evidence & guardrails
+app.get('/api/campaigns/:id/details', async (req, res) => {
+  try {
+    const campaign = await getCampaignById(req.params.id);
+    if (!campaign) {
+      return res.status(404).json({
+        error: 'Campaign not found',
+      });
+    }
+
+    let evidence = null;
+    let explanation = null;
+
+    if (campaign.productA && campaign.productB) {
+      try {
+        const pairAnalytics = await getProductPairAnalytics({
+          minOrdersWithBoth: 1,
+          minConfidence: 0.01,
+          minLift: 1.0,
+          limit: 200,
+        });
+
+        const scored = scoreOpportunities(pairAnalytics);
+        const explained = explainOpportunities(scored);
+
+        const match = explained.find(
+          (o) => o.productA.id === campaign.productA.id && o.productB.id === campaign.productB.id
+        );
+
+        if (match) {
+          evidence = {
+            ordersWithA: match.ordersWithA,
+            ordersWithB: match.ordersWithB,
+            ordersWithBoth: match.ordersWithBoth,
+            missedCustomers: match.missedCustomers,
+            confidence: match.confidence,
+            lift: match.lift,
+            opportunityScore: match.opportunityScore,
+            priority: match.priority,
+            estimatedRevenueOpportunity: match.estimatedRevenueOpportunity,
+          };
+          explanation = match.explanation;
+        }
+      } catch (err) {
+        console.warn('Could not link analytics evidence to campaign:', err.message);
+      }
+    }
+
+    res.json({
+      campaign,
+      evidence,
+      explanation,
+      guardrails: {
+        maxDiscountPercent: 20,
+        maxBudgetLimit: 5000,
+        merchantApprovalRequired: true,
+        autoExecutionAllowed: false,
+      },
+    });
+  } catch (error) {
+    console.error(`Error fetching details for campaign ${req.params.id}:`, error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to fetch campaign details.',
+    });
+  }
+});
+
+
 // 11. POST /api/campaigns/:id/submit — Submit draft campaign for approval
 app.post('/api/campaigns/:id/submit', async (req, res) => {
   try {

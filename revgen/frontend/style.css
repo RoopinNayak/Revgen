@@ -820,6 +820,127 @@ body {
   max-width: 640px;
 }
 
+.modal-card.modal-xl {
+  max-width: 840px;
+}
+
+/* Evidence Visualizer Flow */
+.evidence-flow-visualizer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  gap: var(--spacing-sm);
+  margin: var(--spacing-sm) 0;
+  overflow-x: auto;
+}
+
+.flow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  min-width: 100px;
+}
+
+.flow-step-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.flow-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.flow-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-light);
+}
+
+.flow-arrow {
+  color: var(--text-muted);
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+/* Guardrails Safety Box */
+.guardrails-box {
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.guardrails-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.guardrail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.guardrail-label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.guardrail-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.guardrail-status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--success);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.safety-note {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: var(--spacing-xs);
+  font-style: italic;
+}
+
+.details-section-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 4px;
+  margin-top: var(--spacing-xs);
+}
+
+
 @keyframes modalSlideUp {
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }

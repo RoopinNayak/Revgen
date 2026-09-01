@@ -186,6 +186,23 @@
     </div>
   </div>
 
+  <!-- Campaign Details & Evidence Modal -->
+  <div id="details-modal-overlay" class="modal-overlay hidden">
+    <div class="modal-card modal-xl">
+      <div class="modal-header">
+        <h3 id="details-modal-title" class="modal-title">Campaign Details &amp; Analytics Evidence</h3>
+        <button class="modal-close-btn" type="button" onclick="closeDetailsModal()">&times;</button>
+      </div>
+      <div id="details-modal-body" class="modal-body">
+        <div class="loading-state">Loading campaign details...</div>
+      </div>
+      <div id="details-modal-footer" class="modal-footer">
+        <button class="btn btn-secondary" type="button" onclick="closeDetailsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+
   <script src="app.js"></script>
 </body>
 </html>
