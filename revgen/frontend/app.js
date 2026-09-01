@@ -943,16 +943,16 @@ function showToast(message, type = 'info') {
 }
 
 // ─── Create Campaign Draft Modal Handlers ───
-function openCreateModalFromOpportunityIndex(index) {
+async function openCreateModalFromOpportunityIndex(index) {
   const opp = window.loadedOpportunities && window.loadedOpportunities[index];
   if (!opp) {
     showToast('Unable to find opportunity data.', 'error');
     return;
   }
-  openCreateModalFromOpportunity(opp);
+  await openCreateModalFromOpportunity(opp);
 }
 
-function openCreateModalFromOpportunity(opp) {
+async function openCreateModalFromOpportunity(opp) {
   const overlay = document.getElementById('create-modal-overlay');
   const bodyContainer = document.getElementById('create-modal-body');
   const confirmBtn = document.getElementById('create-confirm-btn');
@@ -961,24 +961,48 @@ function openCreateModalFromOpportunity(opp) {
 
   const pAName = opp.productA ? opp.productA.name : 'Product A';
   const pBName = opp.productB ? opp.productB.name : 'Product B';
+
+  // Show loading state while fetching Growth Agent recommendation preview
+  titleEl = overlay.querySelector('.modal-title');
+  if (titleEl) titleEl.textContent = 'Create Campaign Draft from AI Growth Agent';
+  
+  bodyContainer.innerHTML = '<div class="loading-state">Fetching AI Growth Agent recommendation...</div>';
+  confirmBtn.disabled = true;
+  overlay.classList.remove('hidden');
+
+  let agentData = null;
+  try {
+    const queryStr = opp.productA && opp.productB ? `?productAId=${opp.productA.id}&productBId=${opp.productB.id}` : '';
+    const response = await fetch(`/api/agent/growth-recommendation-preview${queryStr}`);
+    if (response.ok) {
+      agentData = await response.json();
+    }
+  } catch (err) {
+    console.warn('Could not fetch Growth Agent preview, falling back to local opportunity metrics:', err);
+  }
+
+  // Fallback defaults if agent API call is unavailable
+  const analysis = agentData?.analysis || {};
+  const recommendation = agentData?.recommendation || {};
+  const opportunity = agentData?.opportunity || opp;
   const exp = opp.explanation || {};
 
-  const defaultTitle = exp.title || `Cross-sell ${pBName} to ${pAName} buyers`;
-  const defaultDesc = exp.recommendation || `Offer ${pBName} to customers who previously purchased ${pAName}.`;
-  const defaultSegment = (opp.targetSegment || 'premium').toLowerCase();
-  const defaultDiscount = 10;
-  const defaultBudget = 5000;
+  const defaultTitle = recommendation.title || exp.title || `Cross-sell ${pBName} to ${pAName} buyers`;
+  const defaultDesc = recommendation.description || exp.recommendation || `Offer ${pBName} to customers who previously purchased ${pAName}.`;
+  const defaultSegment = (recommendation.targetSegment || opp.targetSegment || 'premium').toLowerCase();
+  const defaultDiscount = recommendation.discountPercent !== undefined ? recommendation.discountPercent : 10;
+  const defaultBudget = recommendation.budgetLimit !== undefined ? recommendation.budgetLimit : 5000;
 
   const priorityClass =
-    opp.priority === 'HIGH'
+    opportunity.priority === 'HIGH'
       ? 'priority-high'
-      : opp.priority === 'MEDIUM'
+      : opportunity.priority === 'MEDIUM'
       ? 'priority-medium'
       : 'priority-low';
 
   bodyContainer.innerHTML = `
-    <!-- Opportunity Evidence Summary -->
-    <div class="details-section-title">Growth Opportunity Context</div>
+    <!-- AI Growth Agent Recommendation Insight -->
+    <div class="details-section-title">⚡ AI Growth Agent Insight</div>
     
     <div class="campaign-relation" style="margin-bottom: var(--spacing-sm);">
       <span>${escapeHtml(pAName)}</span>
@@ -986,30 +1010,46 @@ function openCreateModalFromOpportunity(opp) {
       <span>${escapeHtml(pBName)}</span>
     </div>
 
+    ${analysis.reasoning ? `
+      <div class="details-block" style="background: rgba(99, 102, 241, 0.08); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); border-left: 3px solid var(--accent-light);">
+        <span class="details-label">Agent Reasoning</span>
+        <p class="details-text">${escapeHtml(analysis.reasoning)}</p>
+      </div>
+    ` : ''}
+
+    ${analysis.recommendedAction ? `
+      <div class="details-block" style="margin-top: 6px;">
+        <span class="details-label">Agent Recommended Strategy</span>
+        <p class="details-text">${escapeHtml(analysis.recommendedAction)}</p>
+      </div>
+    ` : ''}
+
+    <!-- Analytics Evidence Grid -->
+    <div class="details-section-title" style="margin-top: var(--spacing-md);">Opportunity Analytics Evidence</div>
     <div class="opp-metrics-grid">
       <div class="opp-metric-item">
         <span class="opp-metric-label">Confidence</span>
-        <span class="opp-metric-value">${formatPercent(opp.confidence)}</span>
+        <span class="opp-metric-value">${formatPercent(opportunity.confidence)}</span>
       </div>
       <div class="opp-metric-item">
         <span class="opp-metric-label">Lift</span>
-        <span class="opp-metric-value">${formatLift(opp.lift)}</span>
+        <span class="opp-metric-value">${formatLift(opportunity.lift)}</span>
       </div>
       <div class="opp-metric-item">
         <span class="opp-metric-label">Missed Customers</span>
-        <span class="opp-metric-value">${formatNumber(opp.missedCustomers)}</span>
+        <span class="opp-metric-value">${formatNumber(opportunity.missedCustomers)}</span>
       </div>
       <div class="opp-metric-item">
         <span class="opp-metric-label">Opportunity Score</span>
-        <span class="opp-metric-value">${(opp.opportunityScore || 0).toFixed(1)} / 100</span>
+        <span class="opp-metric-value">${(opportunity.opportunityScore || 0).toFixed(1)} / 100</span>
       </div>
       <div class="opp-metric-item">
         <span class="opp-metric-label">Priority</span>
-        <span class="opp-metric-value"><span class="badge-priority ${priorityClass}">${escapeHtml(opp.priority)}</span></span>
+        <span class="opp-metric-value"><span class="badge-priority ${priorityClass}">${escapeHtml(opportunity.priority)}</span></span>
       </div>
       <div class="opp-metric-item">
         <span class="opp-metric-label">Est. Revenue</span>
-        <span class="opp-metric-value highlight">${formatCurrency(opp.estimatedRevenueOpportunity)}</span>
+        <span class="opp-metric-value highlight">${formatCurrency(opportunity.estimatedRevenueOpportunity)}</span>
       </div>
     </div>
 
@@ -1069,16 +1109,15 @@ function openCreateModalFromOpportunity(opp) {
           <span class="guardrail-val" style="color: var(--error);">DISABLED</span>
         </div>
       </div>
-      <p class="safety-note">🛡️ This action creates a draft only. The campaign will not be executed or submitted for approval automatically.</p>
+      <p class="safety-note">🛡️ Creating this campaign only creates a draft. It does not submit, approve, or execute the campaign.</p>
     </div>
   `;
 
   confirmBtn.disabled = false;
   confirmBtn.textContent = 'Create Campaign Draft';
-  confirmBtn.onclick = () => handleCreateCampaignSubmit(opp);
-
-  overlay.classList.remove('hidden');
+  confirmBtn.onclick = () => handleCreateCampaignSubmit(opportunity);
 }
+
 
 function closeCreateModal() {
   const overlay = document.getElementById('create-modal-overlay');
