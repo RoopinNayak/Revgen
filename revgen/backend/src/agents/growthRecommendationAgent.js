@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────
-// RevGen — Growth Agent Campaign Recommendation Module (Day 5 Stage 2)
+// RevGen — Growth Agent Campaign Recommendation Module (Day 6 Stage 1)
 // ─────────────────────────────────────────────
 //
 // Pipeline:
 // Opportunity Analytics → Growth Agent Analysis → Recommendation Engine → Guardrails
 //
 // Integrates AI Growth Agent analytical reasoning with safe, bounded
-// campaign recommendations.
+// campaign recommendations and explicit decision rationales.
 //
 // Safety Guardrails:
 // - Max Discount: 20% (Strictly enforced)
@@ -21,10 +21,10 @@ const MAX_DISCOUNT_PERCENT = 20;
 const MAX_CAMPAIGN_BUDGET = 5000;
 
 /**
- * Generates a Growth Agent powered campaign recommendation for a given opportunity.
+ * Generates a Growth Agent powered campaign recommendation with explicit decision rationale.
  *
  * @param {Object} opportunity - Opportunity object from analytics pipeline.
- * @returns {Object} Structured contract combining Growth Agent analysis, recommendation proposal, evidence, and guardrails.
+ * @returns {Object} Structured contract combining Growth Agent analysis, recommendation proposal, rationale, evidence, and guardrails.
  */
 function generateGrowthRecommendation(opportunity) {
   if (!opportunity || typeof opportunity !== 'object') {
@@ -46,32 +46,49 @@ function generateGrowthRecommendation(opportunity) {
   // 2. Campaign Recommendation Engine Rules
   const type = 'cross_sell';
 
-  // Target customer segment rule
+  // Target customer segment rule & rationale
   let targetSegment = 'regular';
+  let segmentReason = '';
+
   if (pB.price >= 200) {
     targetSegment = 'premium';
+    segmentReason = `Premium segment selected because target product price (₹${pB.price.toFixed(2)}) exceeds the ₹200 premium threshold.`;
   } else if (pB.price >= 50) {
     targetSegment = 'regular';
+    segmentReason = `Regular segment selected because target product price (₹${pB.price.toFixed(2)}) falls in the ₹50–₹200 regular range.`;
   } else {
     targetSegment = 'all';
+    segmentReason = `All segment selected because target product (₹${pB.price.toFixed(2)}) is an accessible impulse purchase.`;
   }
 
-  // Bounded discount percent rule
+  // Bounded discount percent rule & rationale
   let recommendedDiscount = 10;
-  if (analysisData.priority === 'HIGH' || analysisData.priority === 'MEDIUM') {
+  let discountReason = '';
+
+  if (analysisData.priority === 'HIGH' || analysisData.opportunityStrength === 'VERY_STRONG') {
     recommendedDiscount = 10;
+    discountReason = '10% promotional discount proposed for HIGH priority opportunity to maximize customer conversion while preserving merchant margin.';
+  } else if (analysisData.priority === 'MEDIUM' || analysisData.opportunityStrength === 'STRONG') {
+    recommendedDiscount = 10;
+    discountReason = '10% promotional discount proposed for MEDIUM priority opportunity to incentivize co-purchase behavior.';
   } else {
     recommendedDiscount = 5;
+    discountReason = 'Conservative 5% promotional discount proposed for LOW priority opportunity to test customer conversion safely.';
   }
 
   // HARD SAFETY CLAMP (0 to 20%)
   const discountPercent = Math.min(MAX_DISCOUNT_PERCENT, Math.max(0, recommendedDiscount));
 
-  // Bounded budget limit rule
+  // Bounded budget limit rule & rationale
   let recommendedBudget = 5000;
+  let budgetReason = '';
+
   if (oppData.estimatedRevenueOpportunity && oppData.estimatedRevenueOpportunity > 0) {
     const estVal = Math.round((oppData.estimatedRevenueOpportunity * 0.08) / 500) * 500;
     recommendedBudget = Math.min(MAX_CAMPAIGN_BUDGET, Math.max(1000, estVal));
+    budgetReason = `Budget limit of ₹${recommendedBudget.toLocaleString('en-IN')} proposed based on an 8% expected yield from ₹${oppData.estimatedRevenueOpportunity.toFixed(2)} estimated revenue opportunity, clamped to the ₹5,000 safety ceiling.`;
+  } else {
+    budgetReason = 'Default ₹5,000 safety budget limit assigned.';
   }
 
   // HARD SAFETY CLAMP (0 to ₹5,000)
@@ -108,6 +125,12 @@ function generateGrowthRecommendation(opportunity) {
       title,
       description,
       estimatedRevenueOpportunity: oppData.estimatedRevenueOpportunity,
+    },
+
+    recommendationRationale: {
+      segmentReason,
+      discountReason,
+      budgetReason,
     },
 
     // 4. Immutable Safety Guarantees
