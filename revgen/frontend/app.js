@@ -754,25 +754,82 @@ async function openDetailsModal(campaignId) {
       </div>
     `;
 
-    // 2. Render AI Agent Decision Summary Block
+    // 2. Render AI Agent Decision Summary & Quality Meters
     let agentSummaryHtml = '';
     if (agentAnalysis && agentAnalysis.reasoning) {
+      const oppStrength = agentAnalysis.opportunityStrength || 'STRONG';
+      const recConfScore = Math.round((agentAnalysis.recommendationConfidence || 0.85) * 100);
+      const recConfLabel = agentAnalysis.recommendationConfidenceLabel || 'HIGH';
+      const isReviewRequired = agentAnalysis.recommendationStatus === 'REVIEW_REQUIRED';
+
+      const strengthClass = oppStrength.toLowerCase().replace(/_/g, '-');
+
       agentSummaryHtml = `
-        <div class="details-section-title">🤖 AI Growth Agent Decision Summary</div>
-        <div class="details-block" style="background: rgba(99, 102, 241, 0.08); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); border-left: 3px solid var(--accent-light);">
+        <div class="details-section-title">🤖 AI Growth Agent Decision Center &amp; Quality Analysis</div>
+        
+        <!-- Decision Quality & Confidence Meters -->
+        <div class="decision-meter-container">
+          <div class="meter-card">
+            <span class="meter-label">Opportunity Strength</span>
+            <div class="meter-val-row">
+              <span class="badge-priority priority-${strengthClass === 'very-strong' || strengthClass === 'strong' ? 'high' : (strengthClass === 'moderate' ? 'medium' : 'low')}">${escapeHtml(oppStrength.replace(/_/g, ' '))}</span>
+            </div>
+            <div class="meter-bar">
+              <div class="meter-fill ${strengthClass}" style="width: ${oppStrength === 'VERY_STRONG' ? '95%' : (oppStrength === 'STRONG' ? '80%' : (oppStrength === 'MODERATE' ? '55%' : '30%'))}"></div>
+            </div>
+          </div>
+
+          <div class="meter-card">
+            <span class="meter-label">Recommendation Confidence</span>
+            <div class="meter-val-row">
+              <span>${recConfScore}% (${escapeHtml(recConfLabel)})</span>
+            </div>
+            <div class="meter-bar">
+              <div class="meter-fill" style="width: ${recConfScore}%"></div>
+            </div>
+          </div>
+        </div>
+
+        ${isReviewRequired || agentAnalysis.reviewReason ? `
+          <div class="review-required-banner">
+            <strong>⚠️ REVIEW REQUIRED:</strong> ${escapeHtml(agentAnalysis.reviewReason || 'The available evidence requires merchant discretion. Review the opportunity metrics carefully before creating or approving a proposal.')}
+          </div>
+        ` : ''}
+
+        <div class="details-block" style="background: rgba(99, 102, 241, 0.08); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); border-left: 3px solid var(--accent-light); margin-top: 8px;">
           <span class="details-label">Agent Reasoning</span>
           <p class="details-text">${escapeHtml(agentAnalysis.reasoning)}</p>
         </div>
-        ${agentAnalysis.recommendedAction ? `
-          <div class="details-block" style="margin-top: 6px;">
-            <span class="details-label">Recommended Action Strategy</span>
-            <p class="details-text">${escapeHtml(agentAnalysis.recommendedAction)}</p>
+
+        <!-- Business Impact Cards -->
+        ${agentAnalysis.businessImpact ? `
+          <div class="business-impact-grid">
+            <div class="impact-card">
+              <div class="impact-card-title">Customer Behavior</div>
+              <div class="impact-card-desc">${escapeHtml(agentAnalysis.businessImpact.customerBehaviorStrength || '')}</div>
+            </div>
+            <div class="impact-card">
+              <div class="impact-card-title">Opportunity Size</div>
+              <div class="impact-card-desc">${escapeHtml(agentAnalysis.businessImpact.opportunitySize || '')}</div>
+            </div>
+            <div class="impact-card">
+              <div class="impact-card-title">Revenue Upside</div>
+              <div class="impact-card-desc">${escapeHtml(agentAnalysis.businessImpact.revenuePotential || '')}</div>
+            </div>
+            <div class="impact-card">
+              <div class="impact-card-title">Strategic Alignment</div>
+              <div class="impact-card-desc">${escapeHtml(agentAnalysis.businessImpact.strategicValue || '')}</div>
+            </div>
           </div>
         ` : ''}
-        ${agentAnalysis.confidenceSummary ? `
-          <div class="details-block" style="margin-top: 6px;">
-            <span class="details-label">Conversion Confidence Summary</span>
-            <p class="details-text">${escapeHtml(agentAnalysis.confidenceSummary)}</p>
+
+        <!-- Decision Rationales -->
+        ${data.recommendationRationale ? `
+          <div class="details-section-title" style="margin-top: 8px;">Parameter Rationale</div>
+          <div class="rationale-grid">
+            <div class="rationale-item"><span class="rationale-label">Segment:</span> ${escapeHtml(data.recommendationRationale.segmentReason || '')}</div>
+            <div class="rationale-item"><span class="rationale-label">Discount:</span> ${escapeHtml(data.recommendationRationale.discountReason || '')}</div>
+            <div class="rationale-item"><span class="rationale-label">Budget:</span> ${escapeHtml(data.recommendationRationale.budgetReason || '')}</div>
           </div>
         ` : ''}
       `;
@@ -782,7 +839,7 @@ async function openDetailsModal(campaignId) {
     let evidenceHtml = '';
     if (ev.confidence !== undefined) {
       evidenceHtml = `
-        <div class="details-section-title">Analytics Evidence &amp; Visualizer</div>
+        <div class="details-section-title">Analytics Evidence &amp; Visualizer (Non-Editable Trusted Data)</div>
         <div class="evidence-flow-visualizer">
           <div class="flow-step">
             <div class="flow-step-icon">📦</div>
@@ -843,6 +900,7 @@ async function openDetailsModal(campaignId) {
         </div>
       `;
     }
+
 
     // 4. Render Guardrails Block
     const guardrailsHtml = `

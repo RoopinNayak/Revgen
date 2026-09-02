@@ -1507,3 +1507,121 @@ body {
     display: none;
   }
 }
+
+/* Decision Center UI Enhancements */
+.decision-meter-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xs);
+}
+
+.meter-card {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meter-label {
+  font-size: 0.725rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.meter-val-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.meter-bar {
+  height: 6px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.meter-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent-color), var(--accent-light));
+  transition: width 0.3s ease;
+}
+
+.meter-fill.very-strong { background: linear-gradient(90deg, #10b981, #34d399); }
+.meter-fill.strong { background: linear-gradient(90deg, #6366f1, #818cf8); }
+.meter-fill.moderate { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.meter-fill.weak { background: linear-gradient(90deg, #f43f5e, #fda4af); }
+
+.review-required-banner {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: #fbbf24;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin: var(--spacing-xs) 0;
+}
+
+.business-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.impact-card {
+  background: rgba(17, 24, 39, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+
+}
+
+.impact-card-title {
+  font-size: 0.725rem;
+  font-weight: 700;
+  color: var(--accent-light);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 2px;
+}
+
+.impact-card-desc {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.rationale-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--spacing-xs);
+}
+
+.rationale-item {
+  background: rgba(99, 102, 241, 0.05);
+  border-left: 3px solid var(--accent-light);
+  padding: 6px 12px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.rationale-label {
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-right: 4px;
+}
