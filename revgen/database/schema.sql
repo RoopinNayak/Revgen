@@ -152,3 +152,30 @@ CREATE TABLE IF NOT EXISTS campaign_executions (
 
 CREATE INDEX IF NOT EXISTS idx_campaign_executions_campaign_id
   ON campaign_executions(campaign_id);
+
+
+-- ─── 8. agent_memory ─────────────────────────
+-- Stores historical merchant decision context for the AI Growth Agent.
+
+CREATE TABLE IF NOT EXISTS agent_memory (
+  id                   SERIAL PRIMARY KEY,
+  campaign_id          INTEGER REFERENCES campaigns(id),
+  product_a_id         INTEGER REFERENCES products(id),
+  product_b_id         INTEGER REFERENCES products(id),
+  opportunity_type     VARCHAR(50) NOT NULL DEFAULT 'cross_sell',
+  opportunity_strength VARCHAR(50),
+  priority             VARCHAR(20),
+  recommended_segment  VARCHAR(20),
+  final_segment        VARCHAR(20),
+  recommended_discount NUMERIC(5, 2),
+  final_discount       NUMERIC(5, 2),
+  recommended_budget   NUMERIC(12, 2),
+  final_budget         NUMERIC(12, 2),
+  merchant_decision    VARCHAR(50) NOT NULL CHECK (merchant_decision IN ('submitted', 'approved', 'rejected', 'reset')),
+  decision_reason      TEXT,
+  created_at           TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_memory_product_pair
+  ON agent_memory(product_a_id, product_b_id);
+

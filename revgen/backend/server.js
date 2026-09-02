@@ -600,6 +600,8 @@ app.get('/api/agent/growth-preview', async (req, res) => {
   }
 });
 
+const { getRelevantMemory, summarizeMemory } = require('./src/agents/agentMemory');
+
 // 20. GET /api/agent/growth-recommendation-preview — Read-only Growth Agent campaign recommendation preview
 app.get('/api/agent/growth-recommendation-preview', async (req, res) => {
   try {
@@ -631,13 +633,48 @@ app.get('/api/agent/growth-recommendation-preview', async (req, res) => {
       }
     }
 
-    const recommendationResult = generateGrowthRecommendation(selectedOpp);
+    // Query historical merchant decision memory (Read-only)
+    const relMemories = await getRelevantMemory(selectedOpp);
+    const memorySummary = summarizeMemory(relMemories);
+
+    const recommendationResult = generateGrowthRecommendation(selectedOpp, memorySummary);
     res.json(recommendationResult);
   } catch (error) {
     console.error('Error running Growth Agent recommendation preview:', error.message);
     res.status(500).json({
       status: 'error',
       message: 'Unable to generate Growth Agent recommendation preview.',
+    });
+  }
+});
+
+// 20b. GET /api/agent/memory/:campaignId — Read-only endpoint for historical merchant decisions
+app.get('/api/agent/memory/:campaignId', async (req, res) => {
+  try {
+    const campaignId = req.params.campaignId;
+    const campaign = await getCampaignById(campaignId);
+
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found.' });
+    }
+
+    const relMemories = await getRelevantMemory({
+      productA: campaign.productA,
+      productB: campaign.productB,
+      type: campaign.type,
+      priority: 'MEDIUM',
+    });
+
+    const memorySummary = summarizeMemory(relMemories);
+    res.json({
+      campaignId: parseInt(campaignId, 10),
+      memory: memorySummary,
+    });
+  } catch (error) {
+    console.error(`Error fetching agent memory for campaign ${req.params.campaignId}:`, error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to fetch agent memory.',
     });
   }
 });

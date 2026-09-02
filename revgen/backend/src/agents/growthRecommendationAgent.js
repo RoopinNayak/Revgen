@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────
-// RevGen — Growth Agent Campaign Recommendation Module (Day 6 Stage 1)
+// RevGen — Growth Agent Campaign Recommendation Module (Day 6 Stage 3)
 // ─────────────────────────────────────────────
 //
 // Pipeline:
 // Opportunity Analytics → Growth Agent Analysis → Recommendation Engine → Guardrails
 //
 // Integrates AI Growth Agent analytical reasoning with safe, bounded
-// campaign recommendations and explicit decision rationales.
+// campaign recommendations, explicit decision rationales, and Historical Merchant Context.
 //
 // Safety Guardrails:
 // - Max Discount: 20% (Strictly enforced)
@@ -21,12 +21,13 @@ const MAX_DISCOUNT_PERCENT = 20;
 const MAX_CAMPAIGN_BUDGET = 5000;
 
 /**
- * Generates a Growth Agent powered campaign recommendation with explicit decision rationale.
+ * Generates a Growth Agent powered campaign recommendation with explicit decision rationale and memory context.
  *
  * @param {Object} opportunity - Opportunity object from analytics pipeline.
- * @returns {Object} Structured contract combining Growth Agent analysis, recommendation proposal, rationale, evidence, and guardrails.
+ * @param {Object} [memorySummary] - Optional pre-summarized merchant decision memory.
+ * @returns {Object} Structured contract combining Growth Agent analysis, recommendation proposal, rationale, evidence, memory, and guardrails.
  */
-function generateGrowthRecommendation(opportunity) {
+function generateGrowthRecommendation(opportunity, memorySummary = null) {
   if (!opportunity || typeof opportunity !== 'object') {
     throw new Error('Invalid opportunity: Opportunity object is required.');
   }
@@ -131,6 +132,14 @@ function generateGrowthRecommendation(opportunity) {
       segmentReason,
       discountReason,
       budgetReason,
+    },
+
+    memory: memorySummary || {
+      available: false,
+      relevantMemoryCount: 0,
+      summary: 'No relevant merchant decision history is available yet.',
+      insights: [],
+      historicalDecisions: [],
     },
 
     // 4. Immutable Safety Guarantees

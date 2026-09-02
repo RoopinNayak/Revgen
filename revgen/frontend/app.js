@@ -832,6 +832,23 @@ async function openDetailsModal(campaignId) {
             <div class="rationale-item"><span class="rationale-label">Budget:</span> ${escapeHtml(data.recommendationRationale.budgetReason || '')}</div>
           </div>
         ` : ''}
+
+        <!-- Historical Merchant Context (Agent Memory) -->
+        ${data.memory || agentAnalysis.memory ? `
+          <div class="details-section-title" style="margin-top: 8px;">🧠 Historical Merchant Context (Agent Memory)</div>
+          <div class="details-block" style="background: rgba(16, 185, 129, 0.05); padding: var(--spacing-sm) var(--spacing-md); border-radius: var(--radius-md); border-left: 3px solid #34d399;">
+            <span class="details-label">Merchant Decision History</span>
+            <p class="details-text">${escapeHtml((data.memory || agentAnalysis.memory).summary || 'No relevant merchant decision history available yet.')}</p>
+            ${(data.memory || agentAnalysis.memory).insights && (data.memory || agentAnalysis.memory).insights.length > 0 ? `
+              <ul style="margin-top: 6px; padding-left: 18px; font-size: 0.8rem; color: var(--text-secondary);">
+                ${(data.memory || agentAnalysis.memory).insights.map(i => `<li>${escapeHtml(i)}</li>`).join('')}
+              </ul>
+            ` : ''}
+            <div style="font-size: 0.725rem; color: var(--text-muted); font-style: italic; margin-top: 6px;">
+              ℹ Historical merchant context is informational and does not override current opportunity analytics.
+            </div>
+          </div>
+        ` : ''}
       `;
     }
 

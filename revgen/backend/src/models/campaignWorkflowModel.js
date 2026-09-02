@@ -91,6 +91,46 @@ async function transitionCampaignStatus(campaignId, targetStatus, action, actor 
     `;
     await client.query(auditQuery, [cId, action, actor, auditDetails]);
 
+    // 6. Record Agent Memory atomically
+    const decMap = {
+      pending_approval: 'submitted',
+      approved: 'approved',
+      rejected: 'rejected',
+      draft: 'reset',
+    };
+    const merchantDecision = decMap[targetStatus] || 'submitted';
+
+    const memQuery = `
+      INSERT INTO agent_memory (
+        campaign_id,
+        product_a_id,
+        product_b_id,
+        opportunity_type,
+        opportunity_strength,
+        priority,
+        recommended_segment,
+        final_segment,
+        recommended_discount,
+        final_discount,
+        recommended_budget,
+        final_budget,
+        merchant_decision,
+        decision_reason,
+        created_at
+      ) VALUES ($1, $2, $3, 'cross_sell', 'STRONG', 'MEDIUM', 'regular', $4, 10, $5, 5000, $6, $7, $8, NOW());
+    `;
+
+    await client.query(memQuery, [
+      cId,
+      campaign.product_a_id || null,
+      campaign.product_b_id || null,
+      campaign.target_segment || 'regular',
+      parseFloat(campaign.discount_percent || 10),
+      parseFloat(campaign.budget_limit || 5000),
+      merchantDecision,
+      extraDetails.reason || null,
+    ]);
+
     await client.query('COMMIT');
 
     // Return updated campaign with populated product information
