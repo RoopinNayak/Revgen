@@ -34,6 +34,11 @@ const {
 } = require('./src/models/campaignExecutionModel');
 const { runGrowthAgent } = require('./src/agents/growthAgent');
 const { generateGrowthRecommendation } = require('./src/agents/growthRecommendationAgent');
+const { isAvailable: isLLMAvailable } = require('./src/ai/llmClient');
+const { analyzeOpportunities } = require('./src/ai/llmGrowthAgent');
+const { selectOpportunity } = require('./src/ai/opportunitySelector');
+const { generateCampaignRecommendation } = require('./src/ai/campaignRecommendationAgent');
+const { runGrowthAnalysis } = require('./src/ai/growthAnalysisOrchestrator');
 
 
 
@@ -757,6 +762,178 @@ app.get('/api/agent/pipeline/:campaignId', async (req, res) => {
   }
 });
 
+// ─── AI / LLM Endpoints ────────────────────
+
+// 22. GET /api/ai/status — Ollama / LLM availability health check
+app.get('/api/ai/status', async (req, res) => {
+  try {
+    const status = await isLLMAvailable();
+    res.json(status);
+  } catch (error) {
+    console.error('Error checking AI status:', error.message);
+    res.json({ available: false, reason: error.message });
+  }
+});
+
+// 23. GET /api/agent/llm-opportunity-analysis — Multi-opportunity LLM analysis
+//     Runs: getProductPairAnalytics() → scoreOpportunities() → analyzeOpportunities(Qwen3)
+//     Falls back to deterministic-only on LLM failure.
+app.get('/api/agent/llm-opportunity-analysis', async (req, res) => {
+  try {
+    // 1. Fetch all candidate pairs from existing analytics pipeline
+    const pairAnalytics = await getProductPairAnalytics({
+      minOrdersWithBoth: 1,
+      minConfidence: 0.01,
+      minLift: 1.0,
+      limit: 200,
+    });
+
+    // 2. Score and rank using existing deterministic scoring
+    const scored = scoreOpportunities(pairAnalytics);
+
+    if (!scored || scored.length === 0) {
+      return res.status(404).json({
+        error: 'No growth opportunities available for LLM analysis.',
+      });
+    }
+
+    // 3. Optional limit parameter (default: top 15 by deterministic score)
+    const limit = req.query.limit ? Math.max(1, Math.min(50, parseInt(req.query.limit, 10))) : 15;
+    const topOpportunities = scored.slice(0, limit);
+
+    // 4. Send to LLM for multi-opportunity analysis (with graceful fallback)
+    const analysisResult = await analyzeOpportunities(topOpportunities);
+
+    res.json(analysisResult);
+  } catch (error) {
+    console.error('Error running LLM opportunity analysis:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to run LLM opportunity analysis.',
+    });
+  }
+});
+
+// 24. GET /api/agent/opportunity-selection — Autonomous opportunity selection layer
+//     Runs: getProductPairAnalytics() → scoreOpportunities() → candidate filtering → Qwen3 analysis → deterministic validation
+app.get('/api/agent/opportunity-selection', async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
+    const minOrdersWithBoth = req.query.minBoth ? parseInt(req.query.minBoth, 10) : undefined;
+    const minConfidence = req.query.minConfidence ? parseFloat(req.query.minConfidence) : undefined;
+    const minLift = req.query.minLift ? parseFloat(req.query.minLift) : undefined;
+
+    const result = await selectOpportunity({
+      candidateLimit: limit,
+      minOrdersWithBoth,
+      minConfidence,
+      minLift,
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error in autonomous opportunity selection:', error.message);
+    res.status(500).json({
+      selectionStatus: 'error',
+      message: 'Unable to complete autonomous opportunity selection.',
+    });
+  }
+});
+
+// 25. GET /api/agent/campaign-recommendation — AI Campaign Recommendation Layer (Day 1 Stage 3)
+//     Runs: selectOpportunity() → generateCampaignRecommendation() → deterministic safety validation
+app.get('/api/agent/campaign-recommendation', async (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : undefined;
+    const minOrdersWithBoth = req.query.minBoth ? parseInt(req.query.minBoth, 10) : undefined;
+    const minConfidence = req.query.minConfidence ? parseFloat(req.query.minConfidence) : undefined;
+    const minLift = req.query.minLift ? parseFloat(req.query.minLift) : undefined;
+    const forceFallback = req.query.forceFallback === 'true';
+
+    // 1. Run Stage 2 Autonomous Opportunity Selection
+    const selectionResult = await selectOpportunity({
+      candidateLimit: limit,
+      minOrdersWithBoth,
+      minConfidence,
+      minLift,
+      forceFallback,
+    });
+
+    if (!selectionResult || selectionResult.selectionStatus !== 'success' || !selectionResult.selectedOpportunity) {
+      return res.status(200).json({
+        recommendationStatus: 'no_opportunity',
+        message: 'No viable opportunity selected for campaign recommendation.',
+        selectionResult,
+      });
+    }
+
+    // 2. Query historical merchant memory if available (read-only)
+    let memorySummary = null;
+    try {
+      const { getRelevantMemory, summarizeMemory } = require('./src/agents/agentMemory');
+      const relMemories = await getRelevantMemory(selectionResult.selectedOpportunity);
+      memorySummary = summarizeMemory(relMemories);
+    } catch (memErr) {
+      console.warn('[Campaign Recommendation API] Could not load agent memory:', memErr.message);
+    }
+
+    // 3. Generate AI Campaign Recommendation with strict safety validation
+    const recommendationResult = await generateCampaignRecommendation(
+      selectionResult.selectedOpportunity,
+      { forceFallback, memorySummary }
+    );
+
+    res.json(recommendationResult);
+  } catch (error) {
+    console.error('Error in AI campaign recommendation:', error.message);
+    res.status(500).json({
+      recommendationStatus: 'error',
+      message: 'Unable to generate AI campaign recommendation.',
+    });
+  }
+});
+
+// 26. POST /api/agent/run-growth-analysis — On-Demand Growth Analysis Trigger (Day 1 Stage 4)
+//     Merchant-triggered action: Fresh DB Analytics → ALL Opps → Stage 2 Selection → Stage 3 Strategy → Safety Guardrails
+app.post('/api/agent/run-growth-analysis', async (req, res) => {
+  try {
+    const limit = req.body?.limit ? parseInt(req.body.limit, 10) : (req.query.limit ? parseInt(req.query.limit, 10) : undefined);
+    const forceFallback = req.body?.forceFallback === true || req.query.forceFallback === 'true';
+
+    // Query historical merchant memory if available (read-only)
+    let memorySummary = null;
+    try {
+      const { getRelevantMemory, summarizeMemory } = require('./src/agents/agentMemory');
+      // Pass general context for memory retrieval
+      const relMemories = await getRelevantMemory({ type: 'cross_sell' });
+      memorySummary = summarizeMemory(relMemories);
+    } catch (memErr) {
+      console.warn('[Run Growth Analysis API] Could not load agent memory:', memErr.message);
+    }
+
+    const result = await runGrowthAnalysis({
+      candidateLimit: limit,
+      forceFallback,
+      memorySummary,
+    });
+
+    res.json(result);
+  } catch (error) {
+    if (error.statusCode === 409 || error.analysisStatus === 'already_running') {
+      return res.status(409).json({
+        analysisStatus: 'already_running',
+        message: 'Growth analysis is already running. Please wait for the active analysis to complete.',
+      });
+    }
+
+    console.error('Error running on-demand growth analysis:', error.message);
+    res.status(500).json({
+      analysisStatus: 'error',
+      message: 'Unable to complete on-demand growth analysis. Please try again.',
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
@@ -771,6 +948,11 @@ app.listen(PORT, () => {
   console.log(`Agent Pipeline: http://localhost:${PORT}/api/agent/pipeline/:campaignId`);
   console.log(`Campaigns:   http://localhost:${PORT}/api/campaigns`);
   console.log(`Executions:  http://localhost:${PORT}/api/executions`);
+  console.log(`AI Status:   http://localhost:${PORT}/api/ai/status`);
+  console.log(`LLM Analysis: http://localhost:${PORT}/api/agent/llm-opportunity-analysis`);
+  console.log(`Opportunity Selection: http://localhost:${PORT}/api/agent/opportunity-selection`);
+  console.log(`Campaign Recommendation: http://localhost:${PORT}/api/agent/campaign-recommendation`);
+  console.log(`Run Growth Analysis: POST http://localhost:${PORT}/api/agent/run-growth-analysis`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
 

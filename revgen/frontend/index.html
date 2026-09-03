@@ -62,10 +62,19 @@
 
       <!-- Growth Opportunities Section -->
       <section class="opportunities-section">
-        <div class="section-header">
-          <h2 class="section-title">Growth Opportunities</h2>
-          <p class="section-subtitle">Data-driven cross-sell opportunities identified from historical purchase behavior.</p>
+        <div class="section-header section-header-flex">
+          <div>
+            <h2 class="section-title">Growth Opportunities</h2>
+            <p class="section-subtitle">Data-driven cross-sell opportunities identified from historical purchase behavior.</p>
+          </div>
+          <button id="btn-run-growth-analysis" class="btn btn-primary btn-run-analysis" type="button" onclick="runOnDemandGrowthAnalysis()">
+            <span class="btn-icon">🔍</span>
+            <span class="btn-text">Run Growth Analysis</span>
+          </button>
         </div>
+
+        <!-- On-Demand Growth Analysis Live Panel -->
+        <div id="growth-analysis-panel" class="growth-analysis-panel hidden"></div>
 
         <div id="opportunities-container" class="opportunities-grid">
           <div class="loading-state">Analyzing purchase patterns...</div>

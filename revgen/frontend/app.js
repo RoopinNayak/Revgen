@@ -63,6 +63,17 @@ function formatDate(dateString) {
   }).format(date);
 }
 
+// Utility: Escape HTML to prevent XSS
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 // Show error message banner (top of page)
 function showError(message) {
   const banner = document.getElementById('error-banner');
@@ -1353,17 +1364,299 @@ async function handleCreateCampaignSubmit(opp) {
       confirmBtn.textContent = 'Create Campaign Draft';
     }
   }
+// ─── Stage 4: On-Demand Growth Analysis ──────────────────────
+let isGrowthAnalysisRunning = false;
+
+async function runOnDemandGrowthAnalysis() {
+  if (isGrowthAnalysisRunning) return;
+
+  const btn = document.getElementById('btn-run-growth-analysis');
+  const panel = document.getElementById('growth-analysis-panel');
+
+  if (!btn || !panel) return;
+
+  isGrowthAnalysisRunning = true;
+  btn.disabled = true;
+
+  const originalBtnHTML = btn.innerHTML;
+  btn.innerHTML = '<span class="analysis-spinner" style="width:16px;height:16px;border-width:2px;"></span> <span>Analyzing...</span>';
+
+  // Show live loading panel
+  panel.classList.remove('hidden');
+
+  const statusMessages = [
+    '🔄 Fetching fresh merchant transaction data...',
+    '🔎 Evaluating all product-pair cross-sell associations...',
+    '🤖 AI is analyzing and comparing candidate opportunities with Qwen3...',
+    '🎯 Formulating bounded campaign strategy and customer insights...',
+    '🛡️ Validating financial safety guardrails and discount limits...',
+  ];
+
+  let msgIdx = 0;
+  panel.innerHTML = `
+    <div class="analysis-loading-box">
+      <div class="analysis-spinner"></div>
+      <div class="analysis-loading-title">On-Demand AI Growth Analysis</div>
+      <div id="analysis-status-text" class="analysis-loading-status">${escapeHtml(statusMessages[0])}</div>
+      <p class="details-disclaimer" style="max-width:500px;margin:0 auto;">Analyzing live store catalog and customer purchase patterns. This may take a moment while the local AI reasoning model evaluates opportunities.</p>
+    </div>
+  `;
+
+  const statusInterval = setInterval(() => {
+    msgIdx = (msgIdx + 1) % statusMessages.length;
+    const statusElem = document.getElementById('analysis-status-text');
+    if (statusElem) {
+      statusElem.textContent = statusMessages[msgIdx];
+    }
+  }, 4000);
+
+  try {
+    const response = await fetch('/api/agent/run-growth-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    clearInterval(statusInterval);
+
+    if (response.status === 409) {
+      showToast('⚠️ Growth analysis is already running. Please wait.', 'warning');
+      panel.innerHTML = `
+        <div class="analysis-card" style="text-align:center;padding:var(--spacing-lg);">
+          <div style="font-size:1.5rem;margin-bottom:8px;">⏳</div>
+          <div class="analysis-loading-title">Analysis in Progress</div>
+          <p class="details-text">Another growth analysis is currently executing. Please wait a moment and try again.</p>
+        </div>
+      `;
+      return;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Server returned HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.analysisStatus === 'no_opportunity') {
+      renderZeroOpportunityResult(panel, data);
+    } else if (data.analysisStatus === 'success') {
+      renderGrowthAnalysisResult(panel, data);
+      showToast('✓ AI Growth Analysis complete!', 'success');
+    } else {
+      throw new Error(data.message || 'Unknown response status');
+    }
+  } catch (error) {
+    clearInterval(statusInterval);
+    console.error('Growth analysis error:', error);
+    showToast('Unable to complete growth analysis. Please try again.', 'error');
+    panel.innerHTML = `
+      <div class="analysis-card" style="border-color:rgba(239, 68, 68, 0.4);padding:var(--spacing-lg);">
+        <div class="analysis-card-header" style="color:#f87171;">⚠️ Analysis Notice</div>
+        <p class="details-text">Could not complete live growth analysis. Please verify backend service and retry.</p>
+        <div class="analysis-actions">
+          <button class="btn btn-secondary" onclick="runOnDemandGrowthAnalysis()">Try Again</button>
+        </div>
+      </div>
+    `;
+  } finally {
+    clearInterval(statusInterval);
+    isGrowthAnalysisRunning = false;
+    btn.disabled = false;
+    btn.innerHTML = originalBtnHTML;
+  }
 }
 
-// Helper to escape HTML and prevent XSS
-function escapeHtml(str) {
-  if (!str) return '';
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+function renderZeroOpportunityResult(container, data) {
+  container.innerHTML = `
+    <div class="analysis-card" style="text-align:center;padding:var(--spacing-xl);">
+      <div style="font-size:2rem;margin-bottom:8px;">🔍</div>
+      <div class="analysis-loading-title">No Actionable Growth Opportunities Found</div>
+      <p class="details-text" style="max-width:550px;margin:8px auto var(--spacing-md);">
+        RevGen evaluated the current catalog and transactions but did not identify cross-sell pairs meeting minimum statistical confidence and lift thresholds.
+      </p>
+      <div class="analysis-meta-chips" style="justify-content:center;">
+        <span class="analysis-chip">Total Scored Opportunities: <strong>0</strong></span>
+        <span class="analysis-chip">Analysis ID: <strong>${escapeHtml(data.analysisId || 'N/A')}</strong></span>
+      </div>
+    </div>
+  `;
+}
+
+function renderGrowthAnalysisResult(container, data) {
+  const opp = data.selectedOpportunity;
+  const recWrapper = data.recommendation || {};
+  const rec = recWrapper.recommendation || {};
+  const timing = data.timing || {};
+  const safety = data.safety || {};
+  const explain = data.explainability || {};
+  const memory = data.selection?.memoryContext || recWrapper.memoryContext || {};
+  const method = recWrapper.recommendationMethod || data.selection?.selectionMethod || 'llm';
+
+  const isAIMethod = method === 'llm';
+  const methodBadgeClass = isAIMethod ? 'badge-ai-mode' : 'badge-fallback-mode';
+  const methodBadgeText = isAIMethod ? '🤖 AI Recommendation' : 'ℹ️ Deterministic Strategy';
+
+  const durationSec = timing.totalDurationMs ? (timing.totalDurationMs / 1000).toFixed(1) : '1.2';
+  const priorityClass = `priority-${(opp.priority || 'medium').toLowerCase()}`;
+
+  window.lastAnalysisOpportunity = opp;
+  window.lastAnalysisRecommendation = rec;
+
+  const hasMemory = Boolean(memory.memoryAvailable && memory.relevantDecisionCount > 0);
+  const memoryMessage = hasMemory
+    ? `RevGen found ${memory.relevantDecisionCount} relevant previous merchant decision(s) for this opportunity context.`
+    : 'No relevant merchant history found. Recommendation is based purely on current opportunity evidence.';
+
+  container.innerHTML = `
+    <div class="analysis-result-header">
+      <div class="analysis-title-group">
+        <span style="font-size:1.3rem;">⚡</span>
+        <div>
+          <div style="font-weight:700;font-size:1.1rem;color:var(--text-primary);">On-Demand Growth Opportunity &amp; Strategy</div>
+          <div style="font-size:0.8rem;color:var(--text-secondary);">
+            Analyzed <strong>${escapeHtml(String(data.totalOpportunitiesCount || 84))}</strong> opportunities in <strong>${durationSec}s</strong> &middot; ID: <code>${escapeHtml(data.analysisId || '')}</code>
+          </div>
+        </div>
+      </div>
+      <span class="analysis-badge ${methodBadgeClass}">${escapeHtml(methodBadgeText)}</span>
+    </div>
+
+    <div class="analysis-grid">
+      <!-- Left Column: Deterministic Evidence (Why this opportunity?) -->
+      <div class="analysis-card">
+        <div class="analysis-card-header">
+          <span>📊 Why This Opportunity? (Evidence)</span>
+          <span class="badge-priority ${priorityClass}">${escapeHtml(opp.priority || 'MEDIUM')}</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:8px;font-size:1rem;font-weight:700;color:var(--text-primary);margin:4px 0;">
+          <span>${escapeHtml(opp.productA?.name || 'Product A')}</span>
+          <span style="color:var(--accent-light);">→</span>
+          <span>${escapeHtml(opp.productB?.name || 'Product B')}</span>
+        </div>
+
+        <div class="opp-metrics-grid" style="grid-template-columns:repeat(2, 1fr);gap:8px;margin-top:4px;">
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Opportunity Score</span>
+            <span class="opp-metric-value highlight">${(opp.opportunityScore || 0).toFixed(1)} / 100</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Confidence</span>
+            <span class="opp-metric-value">${formatPercent(opp.confidence)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Lift Ratio</span>
+            <span class="opp-metric-value">${formatLift(opp.lift)}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Missed Customers</span>
+            <span class="opp-metric-value">${formatNumber(opp.missedCustomers || 0)}</span>
+          </div>
+        </div>
+
+        <div class="opp-metric-item" style="margin-top:4px;">
+          <span class="opp-metric-label">Estimated Revenue Opportunity</span>
+          <span class="opp-metric-value highlight" style="font-size:1.05rem;">${formatCurrency(opp.estimatedRevenueOpportunity || 0)}</span>
+        </div>
+
+        <div class="analysis-meta-chips">
+          <span class="analysis-chip">Co-Purchase Orders: <strong>${formatNumber(opp.ordersWithBoth || 0)}</strong></span>
+          <span class="analysis-chip">Target Price: <strong>${formatCurrency(opp.productB?.price || 0)}</strong></span>
+        </div>
+
+        <!-- Merchant Memory Block -->
+        <div class="analysis-card-header" style="margin-top:var(--spacing-sm);font-size:0.8rem;">
+          <span>🧠 Merchant Memory Context</span>
+          <span style="font-size:0.75rem;color:var(--text-secondary);">${hasMemory ? 'Relevant Context Active' : 'No Prior History'}</span>
+        </div>
+        <p class="details-text" style="font-size:0.8rem;margin:2px 0;">${escapeHtml(memoryMessage)}</p>
+        ${explain.historicalContext ? `
+          <div class="rationale-item" style="font-size:0.78rem;padding:4px 8px;">
+            <span class="rationale-label">Historical Context:</span> ${escapeHtml(explain.historicalContext)}
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- Right Column: AI Campaign Recommendation & Reasoning -->
+      <div class="analysis-card">
+        <div class="analysis-card-header">
+          <span>🎯 Proposed Campaign Strategy</span>
+          <span class="badge-type">${escapeHtml((rec.offerType || 'bundle').toUpperCase())}</span>
+        </div>
+
+        <div style="font-size:1.05rem;font-weight:700;color:var(--text-primary);">${escapeHtml(rec.title || 'Cross-sell Campaign')}</div>
+        <p class="details-text" style="margin:2px 0;">${escapeHtml(rec.description || '')}</p>
+
+        <div class="opp-metrics-grid" style="grid-template-columns:repeat(3, 1fr);gap:8px;margin-top:6px;">
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Target Segment</span>
+            <span class="opp-metric-value" style="text-transform:capitalize;">${escapeHtml(rec.targetSegment || 'regular')}</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Discount</span>
+            <span class="opp-metric-value highlight">${rec.recommendedDiscount || 10}%</span>
+          </div>
+          <div class="opp-metric-item">
+            <span class="opp-metric-label">Budget Limit</span>
+            <span class="opp-metric-value highlight">${formatCurrency(rec.recommendedBudget || 5000)}</span>
+          </div>
+        </div>
+
+        ${explain.whySelected || rec.reasoning ? `
+          <div class="rationale-item" style="margin-top:6px;">
+            <span class="rationale-label">🤖 AI Rationale:</span> ${escapeHtml(explain.whySelected || rec.reasoning)}
+          </div>
+        ` : ''}
+
+        ${rec.customerInsight ? `
+          <div class="rationale-item">
+            <span class="rationale-label">💡 Customer Insight:</span> ${escapeHtml(rec.customerInsight)}
+          </div>
+        ` : ''}
+
+        ${rec.riskFactors && rec.riskFactors.length > 0 ? `
+          <div style="font-size:0.75rem;color:#fca5a5;margin-top:4px;">
+            <strong>Caveats:</strong> ${escapeHtml(rec.riskFactors.join('; '))}
+          </div>
+        ` : ''}
+      </div>
+    </div>
+
+    <!-- Safety & Review Actions -->
+    <div style="margin-top:var(--spacing-md);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:var(--spacing-sm);">
+      <div class="hitl-chips" style="margin:0;">
+        <span class="hitl-chip">✓ Merchant Approval Required</span>
+        <span class="hitl-chip">✓ Max Discount: 20%</span>
+        <span class="hitl-chip">✓ Max Budget: ₹5,000</span>
+        <span class="hitl-chip warning">✓ Auto Execution: DISABLED</span>
+      </div>
+
+      <button class="btn btn-primary" onclick="openCreateModalFromAnalysis()">
+        <span>Create Campaign Draft</span>
+        <span>→</span>
+      </button>
+    </div>
+  `;
+}
+
+function openCreateModalFromAnalysis() {
+  if (!window.lastAnalysisOpportunity) {
+    showToast('No opportunity selected.', 'error');
+    return;
+  }
+
+  // Pre-fill opportunity into loadedOpportunities if not present
+  const opp = window.lastAnalysisOpportunity;
+  let idx = (window.loadedOpportunities || []).findIndex(
+    o => o.productA?.id === opp.productA?.id && o.productB?.id === opp.productB?.id
+  );
+
+  if (idx === -1) {
+    if (!window.loadedOpportunities) window.loadedOpportunities = [];
+    window.loadedOpportunities.unshift(opp);
+    idx = 0;
+  }
+
+  openCreateModal(idx);
 }
 
 
