@@ -1,158 +1,243 @@
-# RevGen — AI Merchant Growth / Upsell & Cross-Sell Agent
+# RevGen — AI Merchant Growth Agent
 
-> **Razorpay Buildathon — Track 1: AI Growth & Agentic Commerce**  
+> **Submission for Razorpay Buildathon — Track 1: AI Growth & Agentic Commerce**  
 > *An autonomous, safety-bounded AI agent that discovers high-upside cross-sell opportunities from merchant transaction data, formulates targeted campaign strategies, and executes safe campaigns through Razorpay Test Mode with strict human-in-the-loop merchant approval.*
 
 ---
 
-## 🌟 Key Design Principle
+## 📹 Demo Video
+
+> **📺 Demonstration Video**: [Add final demo video link]
+
+---
+
+## Overview
+
+**RevGen** is an AI-powered merchant growth agent built for the **Razorpay Buildathon (Track 1: AI Growth & Agentic Commerce)**.
+
+RevGen analyzes historical merchant sales, order relationships, and catalog items to identify high-value upsell and cross-sell opportunities. It uses local AI reasoning to formulate an explainable campaign strategy, enforces deterministic safety boundaries, requires mandatory merchant approval, and safely executes test transactions via **Razorpay Test Mode**.
+
+---
+
+## Problem
+
+E-commerce merchants collect significant transaction, customer, and product catalog data, but unlocking incremental revenue remains a major challenge:
+- **Manual Discovery is Impractical**: Finding strong multi-item affinity pairs across large catalogs requires complex association rule mining.
+- **Generic Promotions Fail**: Static discounts often eat into margins without driving meaningful cross-sell conversions.
+- **Fear of Autonomous Actions**: Merchants cannot trust black-box AI tools that unilaterally discount items, charge budgets, or execute transactions without oversight.
+
+**RevGen solves this** by transforming raw historical purchase records into ranked, actionable, and explainable growth campaigns while keeping the merchant fully in control.
+
+---
+
+## Core Design Principle
 
 > **"Deterministic analytics provide the numerical evidence, while AI provides the business reasoning. The AI recommends, but the merchant remains in control."**
 
-RevGen does not let an AI hallucinate mathematical metrics or autonomously execute financial transactions. Instead:
-- **PostgreSQL & Market Basket Algorithms** evaluate 100% of historical transactions to calculate mathematically exact Support, Confidence, Lift, and Revenue Upside.
-- **Qwen3:8b (via local Ollama)** reviews the highest-ranked candidate opportunities, applies business context and historical merchant memory, and generates marketing strategies.
-- **Deterministic Guardrails** strictly cap discounts ($\le 20\%$) and campaign budgets ($\le ₹5,000$).
-- **Human-in-the-Loop Governance** guarantees that no campaign is executed without explicit merchant approval.
-- **Campaign Execution** operates exclusively in **Razorpay Test Mode** / sandbox simulation with 0 AI latency and zero live financial risk.
+RevGen strictly separates mathematical truth from generative business strategy:
+- **Deterministic Analytics Engine**: Evaluates 100% of historical transactions to calculate mathematically exact Support, Confidence, Lift, and Estimated Revenue Opportunity.
+- **Qwen3:8b AI Growth Agent**: Evaluates candidate opportunities, incorporates merchant memory context, explains the business reasoning, and generates campaign strategy, audience targeting, and copy.
+- **Deterministic Safety Guardrails**: Enforces non-negotiable limits on discounts ($\le 20\%$) and budgets ($\le ₹5,000$).
+- **Human-in-the-Loop Governance**: The LLM cannot directly modify the database or execute financial actions. Every campaign requires explicit merchant approval before execution.
 
 ---
 
-## 🏗️ End-to-End Architecture
+## Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Frontend["Merchant Dashboard (Vanilla JS / Semantic HTML5)"]
-        UI["Merchant Views Store KPIs & Analytics"]
-        Btn["Merchant Clicks: 🔍 Run Growth Analysis"]
+    subgraph Step1["1. Merchant Interface"]
+        UI["Merchant Dashboard"]
+        Trigger["Click: 🔍 Run Growth Analysis"]
     end
 
-    subgraph DataLayer["Deterministic Analytics Engine (PostgreSQL)"]
-        DB[(Store Transactions & Catalog)]
+    subgraph Step2["2. Deterministic Analytics"]
+        DB[(PostgreSQL Store Data)]
         MBA["Market Basket Analysis<br/>(Support, Confidence, Lift)"]
-        Rank["Opportunity Scoring & Ranking<br/>(84 Evaluated Opportunities)"]
+        Score["Opportunity Scoring Engine<br/>(84 Evaluated Opportunities)"]
     end
 
-    subgraph AILayer["AI Growth Agent (Local Qwen3:8b via Ollama)"]
-        LLMSel["Autonomous Opportunity Selection<br/>+ Comparative AI Reasoning"]
-        LLMRec["Campaign Strategy Recommendation<br/>(Audience, Offer Type, Copywriting)"]
-        Mem["Merchant Memory & Historical Context"]
+    subgraph Step3["3. AI Growth Agent"]
+        Qwen["Qwen3:8b Reasoning Agent<br/>(via Local Ollama)"]
+        Strategy["Campaign Recommendation<br/>(Audience, Offer Type, Copy)"]
+        Memory["Merchant Memory & History Context"]
     end
 
-    subgraph SafetyGate["Deterministic Safety & Governance"]
-        Guard["Safety Validator<br/>(Discount ≤ 20%, Budget ≤ ₹5,000)"]
+    subgraph Step4["4. Safety & Governance"]
+        Guard["Safety Validator<br/>(Max 20% Discount, Max ₹5,000 Budget)"]
         Approval{"Merchant Review & Approval"}
     end
 
-    subgraph ExecEngine["Campaign Execution & Payments"]
+    subgraph Step5["5. Execution & Gateway"]
         Exec["100% AI-Free Execution Engine"]
-        RZP["Razorpay Test Mode / Sandbox<br/>(Paise-Converted Item Price)"]
-        Sim["Safe Simulation Fallback<br/>(When API Keys Unavailable)"]
+        RZP["Razorpay Test Mode / Sandbox<br/>(Discounted Item Price in Paise)"]
     end
 
-    subgraph Reporting["Audit & Business Impact"]
+    subgraph Step6["6. Reporting & Audit"]
         Audit["Sanitized Chronological Audit Trail"]
-        RevDash["Three-Pillar Revenue & ROI Dashboard"]
+        Dashboard["Three-Pillar Revenue & ROI Dashboard"]
     end
 
-    UI --> Btn
-    Btn --> MBA
+    UI --> Trigger
+    Trigger --> MBA
     DB --> MBA
-    MBA --> Rank
-    Rank --> LLMSel
-    Mem --> LLMSel
-    LLMSel --> LLMRec
-    LLMRec --> Guard
+    MBA --> Score
+    Score --> Qwen
+    Memory --> Qwen
+    Qwen --> Strategy
+    Strategy --> Guard
     Guard --> Approval
-    Approval -- "Approved" --> Exec
+    Approval -- "Merchant Approves" --> Exec
     Exec --> RZP
-    Exec --> Sim
     RZP --> Audit
-    Sim --> Audit
-    Audit --> RevDash
+    Audit --> Dashboard
 ```
 
+### Architecture Pipeline Stages:
+1. **Merchant Dashboard**: Displays store performance and provides an explicit on-demand trigger (**"🔍 Run Growth Analysis"**). Opening the dashboard does not invoke AI models.
+2. **PostgreSQL / Deterministic Analytics**: Calculates association rules across the full order dataset.
+3. **Opportunity Scoring**: Ranks product affinity pairs deterministically by statistical strength and revenue upside.
+4. **Qwen3 AI Growth Agent**: Evaluates top candidate pairs with comparative business reasoning and merchant memory.
+5. **Campaign Recommendation**: Formulates audience segments, discount parameters, and promotional copy.
+6. **Safety Validation**: Validates discount and budget limits deterministically.
+7. **Merchant Approval**: Places the campaign into a reviewable state; auto-execution is strictly disabled.
+8. **Razorpay Test Mode**: Executes the approved campaign via Razorpay sandbox order creation without AI latency.
+9. **Audit Trail & Revenue Dashboard**: Records tamper-evident audit logs and presents three-pillar financial metrics.
+
 ---
 
-## 🚀 How RevGen Works
+## Key Features
 
-### 1. Deterministic Market Basket Analytics
-On database initialization, RevGen evaluates transactional history across all product pairs using association rule mining:
-- **Support**: Frequency of joint item purchases across transactions.
-- **Confidence**: Probability that a customer buying Product A will also purchase Product B:
-  $$\text{Confidence}(A \rightarrow B) = \frac{\text{Count}(A \cap B)}{\text{Count}(A)}$$
-- **Lift**: Strength of association over random chance:
-  $$\text{Lift}(A \rightarrow B) = \frac{\text{Confidence}(A \rightarrow B)}{\text{Support}(B)}$$
-- **Estimated Revenue Opportunity**: Theoretical revenue potential if un-cross-sold customers who purchased Product A subsequently purchase Product B:
-  $$\text{Estimated Opportunity} = (\text{Customers of } A - \text{Customers of } A \cap B) \times \text{Price}(B)$$
+1. **On-Demand AI Growth Analysis**: Merchant-triggered pipeline that runs deterministic analytics and AI reasoning on live transaction data.
+2. **Autonomous Opportunity Selection**: Evaluates the full opportunity landscape and selects the highest-conviction cross-sell pair with structured reasoning.
+3. **AI Campaign Recommendation**: Crafts tailored campaign parameters including targeted customer segments, offer types, and promotional messaging.
+4. **Safety & Guardrails**:
+   - Maximum discount strictly bounded at **20%**.
+   - Maximum campaign budget strictly capped at **₹5,000**.
+   - **Merchant approval is mandatory** before any execution.
+   - **Automatic execution is disabled by design**.
+   - **Execution is idempotent** (re-running completed campaigns creates no duplicate orders).
+   - **Financial execution does not invoke the LLM** (100% AI-free execution).
+5. **Merchant Approval Workflow**: Complete state machine lifecycle (`draft` $\rightarrow$ `pending_approval` $\rightarrow$ `approved` $\rightarrow$ `executing` $\rightarrow$ `completed` / `failed`).
+6. **Razorpay Test Mode Execution**: Safe sandbox order generation for the discounted item price converted to INR paise.
+7. **Agent Memory**: Learns from previous merchant approval/rejection decisions to provide context-aware recommendations over time.
+8. **Explainability**: Clear breakdowns of deterministic analytics evidence, customer purchase insight, and AI reasoning behind every selection.
+9. **Failure Handling & Recovery**: Safe simulation and error handling with reset transitions back to draft on gateway failure.
+10. **Sanitized Audit Trail**: Chronological event logs with zero leaked API keys, authorization tokens, or stack traces.
+11. **Revenue & ROI Dashboard**: Clean separation of predictive upside, sandbox transactions, and real merchant revenue.
 
-### 2. Autonomous AI Opportunity Selection
-When the merchant clicks **"🔍 Run Growth Analysis"**, candidate opportunities are passed to the local **Qwen3:8b** agent. The AI:
-- Compares candidates based on affinity, margin potential, and audience size.
-- Synthesizes a structured JSON decision explaining *why* the top pair was chosen.
-- Automatically falls back to deterministic rule scoring if Ollama is offline or times out.
+---
 
-### 3. AI Campaign Recommendation & Explainability
-The AI crafts a targeted campaign proposal:
-- **Campaign Title & Description**
-- **Target Customer Segment** (`premium`, `regular`, `budget`, or `all`)
-- **Recommended Offer Type** (`percentage_discount`, `fixed_bundle`, etc.)
-- **Discount Percentage** (bounded $\le 20\%$)
-- **Budget Limit** (bounded $\le ₹5,000$)
-- **Strategic Reasoning & Customer Insights**
+## Example Opportunity
 
-### 4. Human-in-the-Loop Merchant Approval Workflow
-The proposed campaign is created in `draft` status. The merchant can review the AI strategy, customize copy or discount rates within guardrails, and move through the status lifecycle:
-$$\text{draft} \longrightarrow \text{pending\_approval} \longrightarrow \text{approved} \longrightarrow \text{executing} \longrightarrow \text{completed} \text{ / } \text{failed}$$
+The following real cross-sell opportunity is discovered and demonstrated from the historical store dataset:
 
-### 5. Razorpay Test Mode Execution
-Once approved, the merchant triggers execution:
-- **100% AI-Free Execution**: No LLM calls are made during payment processing, ensuring zero latency and zero non-deterministic side effects.
-- **Paise Precision**: Automatically computes the discounted item price in INR paise and generates a genuine Razorpay Test Mode order (`order_...`).
-- **Strict Idempotency**: Repeated execution requests return `{ idempotent: true, razorpayCalled: false }` to prevent duplicate transactions or double-charging.
-- **Controlled Failure Simulation**: Supports `?forceFail=true` to demonstrate resilient error recovery and state reset back to `draft`.
+### **Phone Case + Smartphone**
+- **Association Lift**: `4.13×` *(Customers purchasing a Smartphone are 4.13× more likely to buy a Phone Case)*
+- **Confidence**: `25.6%`
+- **Estimated Revenue Opportunity**: `₹85,398.78`
+- **Potential Target Audience Identified from Historical Data**: `122 customers`
+- **Recommended Strategy**: Cross-sell bundle
+- **Discount Percentage**: `10%`
+- **Campaign Budget**: `₹2,500`
+- **Target Segment**: Regular
+- **Expected Additional Customers**: `12`
 
-### 6. Three-Pillar Revenue & ROI Dashboard
-RevGen maintains complete financial transparency by separating metrics into three distinct pillars:
+> [!IMPORTANT]
+> **Terminology & Transparency Notice**:
+> - **₹85,398.78 is an ESTIMATED REVENUE OPPORTUNITY**, not realized revenue. It reflects the theoretical upside if un-cross-sold historical customers were converted.
+> - The **122 customers** represent a potential target audience identified from historical purchase behavior. The current MVP **does NOT automatically send discounts or promotional messages** to these customers.
 
-| Metric Pillar | Definition | Current Prototype Value |
+---
+
+## Razorpay Integration
+
+- RevGen operates exclusively against **Razorpay Test Mode** (`rzp_test_...`).
+- Approved campaigns generate a Razorpay Test Mode order for the discounted unit price in paise (e.g., `₹699` at `10% off` $\rightarrow$ `₹629.10` $\rightarrow$ `62910 paise`).
+- **No real money is involved, and no real customer cards are charged.**
+- Live keys (`rzp_live_...`) are blocked with HTTP `403 Forbidden` to prevent accidental production transactions.
+- **Execution Flow**:
+  $$\text{Merchant Approval} \longrightarrow \text{Execute Campaign} \longrightarrow \text{Razorpay Test Mode Order} \longrightarrow \text{Audit Trail Log}$$
+
+---
+
+## Revenue & ROI Transparency
+
+RevGen maintains clear financial distinctions across three metric pillars:
+
+| Metric Pillar | Definition | Value in Prototype |
 | :--- | :--- | :--- |
-| **Estimated Revenue Opportunity** | Theoretical revenue upside across the catalog calculated by predictive market basket models. | Metric displayed across candidate opportunities |
-| **Test Transaction Value** | Total order amount generated in Razorpay Test Mode / sandbox simulation. | Cumulative sandbox transaction volume |
-| **Real Merchant Revenue** | Actual money received into merchant bank accounts. | **Strictly ₹0.00** *(No real customer cards charged)* |
+| **Estimated Revenue Opportunity** | Theoretical revenue upside across the catalog predicted by market basket analytics. | Displayed on opportunity cards |
+| **Test Transaction Value** | Total order value generated during Razorpay Test Mode sandbox simulations. | Cumulative test orders |
+| **Real Merchant Revenue** | Actual money deposited into merchant accounts. | **Strictly ₹0.00** |
+
+> **"Real Merchant Revenue is ₹0.00 in the current prototype because Razorpay Test Mode is used."**
+
+The ROI displayed by the system is an **Estimated ROI** calculated from the campaign's estimated opportunity and budget ($(\text{Net Opportunity} / \text{Budget}) \times 100$), **not realized financial ROI**. Realized ROI remains `N/A` until verified real-money transactions occur.
 
 ---
 
-## 🛠️ Technology Stack
+## Agent Memory & Explainability
 
-| Layer | Technology | Details |
-| :--- | :--- | :--- |
-| **Frontend** | HTML5, CSS3, Vanilla JavaScript | Zero-framework, responsive dark-mode UI with glassmorphic cards and micro-animations. |
-| **Backend** | Node.js (v18+), Express | RESTful architecture with structured error handling and parameterized queries. |
-| **Database** | PostgreSQL (v14+) | Relational storage for orders, catalog, campaigns, memory, and audit trails. |
-| **Local AI Engine** | Ollama + Qwen3:8b | Local LLM inference with structured JSON extraction and deterministic fallback. |
-| **Payment Gateway** | Razorpay Node SDK (Test Mode) | Sandbox order creation and payment link verification. |
-| **Testing** | Node Test Runner | 8 comprehensive regression suites with 161 automated tests. |
+- **Contextual Memory**: Previous merchant approval, rejection, and reset decisions are stored in `agent_memory` and retrieved to enrich subsequent prompt contexts.
+- **Analytics Remain Authoritative**: Historical decisions influence contextual reasoning only; current transactional analytics remain the source of mathematical truth.
+- **Evidence-First Presentation**: Every campaign card displays both the deterministic analytics evidence (Lift, Confidence, Missed Customers) and the LLM's natural language justification.
 
 ---
 
-## 📂 Project Structure
+## Failure Handling & Recovery
+
+RevGen includes a deterministic failure mechanism (`?forceFail=true`) for demonstration:
+- **Graceful Failure**: If a gateway error or timeout occurs during execution, the campaign transitions to `failed`.
+- **Zero Fake Success**: **No** fake Razorpay order ID is created, and **no** fake revenue is added to the dashboard.
+- **Audit Trace**: The audit trail records `campaign_execution_started` followed by `campaign_execution_failed` with a sanitized error description.
+- **Merchant Recovery**: The merchant can reset the failed campaign back to `draft` via `POST /api/campaigns/:id/reset` to modify parameters and retry.
+
+---
+
+## Technology Stack
+
+### Frontend
+- **HTML5**: Semantic document structure
+- **CSS3**: Custom dark-mode design system with CSS custom properties
+- **Vanilla JavaScript**: Zero-framework asynchronous UI logic
+
+### Backend
+- **Node.js** (v18+)
+- **Express**: RESTful API service
+
+### Database
+- **PostgreSQL** (v14+): Relational database with parameterized queries
+
+### AI Engine
+- **Ollama**: Local model runtime
+- **Qwen3:8b**: Structured reasoning model with deterministic fallback
+
+### Payments
+- **Razorpay Node SDK** (Test Mode / Sandbox)
+
+### Testing
+- **Node.js Native Test Runner**
+
+---
+
+## Project Structure
 
 ```
 revgen/
 ├── backend/
 │   ├── server.js                          # Express server & API routes
 │   ├── package.json                       # Backend dependencies & test scripts
-│   ├── .env.example                       # Safe environment variable template
+│   ├── .env.example                       # Environment variable template
 │   ├── src/
 │   │   ├── db.js                          # PostgreSQL connection pool
 │   │   ├── ai/
 │   │   │   ├── llmClient.js               # Ollama connection & JSON parser
-│   │   │   ├── llmGrowthAgent.js          # Multi-candidate comparison engine
+│   │   │   ├── llmGrowthAgent.js          # Multi-opportunity comparison
 │   │   │   ├── opportunitySelector.js     # Autonomous selection with fallback
-│   │   │   ├── campaignRecommendationAgent.js # Strategy recommendation
+│   │   │   ├── campaignRecommendationAgent.js # Campaign strategy formulation
 │   │   │   ├── relevantAgentMemory.js     # Merchant memory retrieval
-│   │   │   └── growthAnalysisOrchestrator.js # End-to-end analysis pipeline
+│   │   │   └── growthAnalysisOrchestrator.js # End-to-end analysis orchestrator
 │   │   ├── analytics/
 │   │   │   ├── productPairs.js            # Market basket association mining
 │   │   │   ├── opportunityScoring.js      # Deterministic opportunity scoring
@@ -176,40 +261,41 @@ revgen/
 │       ├── revenueDashboard.test.js       # Stage 8 tests (21 tests)
 │       └── failureHandlingAudit.test.js   # Stage 9 tests (20 tests)
 ├── database/
-│   ├── schema.sql                         # Complete PostgreSQL schema
+│   ├── schema.sql                         # PostgreSQL schema definition
 │   ├── seed.js                            # Deterministic dataset generator (3,000 orders)
-│   └── package.json                       # Database tooling dependencies
+│   ├── package.json                       # Database tooling dependencies
+│   └── README.md                          # Database setup documentation
 ├── frontend/
-│   ├── index.html                         # Single-page dashboard interface
-│   ├── style.css                          # Custom CSS design system
-│   └── app.js                             # Client application logic
-├── .gitignore                             # Comprehensive ignore rules
-└── README.md                              # This file
+│   ├── index.html                         # Merchant dashboard interface
+│   ├── app.js                             # Client-side UI & modal controller
+│   └── style.css                          # Custom design stylesheet
+├── .gitignore                             # Repository ignore rules
+└── README.md                              # This documentation file
 ```
 
 ---
 
-## ⚡ Quick Start & Local Setup
+## Setup & Installation
 
 ### 1. Prerequisites
-- **Node.js**: v18.0.0 or higher
-- **PostgreSQL**: v14.0 or higher
-- **Ollama** *(Optional for local AI)*: `ollama run qwen3:8b` (Deterministic fallback activates automatically if Ollama is offline)
+- **Node.js**: v18 or higher
+- **PostgreSQL**: v14 or higher running locally
+- **Ollama** *(Optional for local AI)*: `ollama run qwen3:8b` (Deterministic fallback activates automatically if Ollama is unavailable)
 
-### 2. Clone & Install
+### 2. Clone & Install Dependencies
 ```bash
 git clone https://github.com/RoopinNayak/Revgen.git
 cd Revgen/revgen/backend
 npm install
 ```
 
-### 3. Configure Environment Variables
-Copy `.env.example` to `.env`:
+### 3. Environment Configuration
+Create `.env` in `revgen/backend/`:
 ```bash
 cp .env.example .env
 ```
 
-Configure your local credentials in `revgen/backend/.env`:
+Configure local environment variables in `revgen/backend/.env`:
 ```ini
 PORT=3000
 DATABASE_URL=postgres://postgres:password@localhost:5432/revgen
@@ -218,67 +304,74 @@ LLM_MODEL=qwen3:8b
 RAZORPAY_KEY_ID=rzp_test_YourTestKeyId
 RAZORPAY_KEY_SECRET=YourTestKeySecret
 ```
-*(If Razorpay keys are omitted, RevGen automatically operates in transparent simulation fallback mode).*
+*(If Razorpay keys are omitted, RevGen automatically falls back to transparent simulation mode).*
 
-### 4. Seed the Database
-Initialize the schema and seed 3,000 realistic historical transactions:
+### 4. Initialize and Seed Database
 ```bash
 cd ../database
 npm install
 node seed.js
 ```
 
-### 5. Start the Application
+### 5. Start the Server
 ```bash
 cd ../backend
 npm start
 ```
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
+Access the dashboard at **[http://localhost:3000](http://localhost:3000)**.
 
 ---
 
-## 🧪 Automated Test Suite
+## Testing
 
-RevGen includes a comprehensive automated test suite covering all layers of analytics, AI selection, safety bounds, Razorpay test execution, ROI calculations, and failure recovery.
+RevGen includes a full regression test suite with **161 automated tests** passing across 8 stage test suites:
 
-To run the complete test suite:
 ```bash
 cd revgen/backend
 npm test
 ```
 
-### Verified Test Results: **161 / 161 Tests PASS (100%)**
-- **Stage 2** (Autonomous Opportunity Selection): `20 / 20 PASS`
-- **Stage 3** (AI Campaign Recommendation): `20 / 20 PASS`
-- **Stage 4** (On-Demand Growth Orchestration): `20 / 20 PASS`
-- **Stage 5** (Agent Memory & Explainability): `20 / 20 PASS`
-- **Stage 6** (Razorpay Test Mode Foundation): `20 / 20 PASS`
-- **Stage 7** (Razorpay Campaign Execution): `20 / 20 PASS`
-- **Stage 8** (Revenue & Transaction Dashboard): `21 / 21 PASS`
-- **Stage 9** (Failure Handling & Audit Trail): `20 / 20 PASS`
+### Verified Test Results: **161 / 161 PASS (100%)**
+- **Stage 2** — Opportunity Selector: `20/20 PASS`
+- **Stage 3** — AI Campaign Recommendation: `20/20 PASS`
+- **Stage 4** — Growth Orchestrator: `20/20 PASS`
+- **Stage 5** — Agent Memory & Explainability: `20/20 PASS`
+- **Stage 6** — Razorpay Test Mode Foundation: `20/20 PASS`
+- **Stage 7** — Razorpay Campaign Execution: `20/20 PASS`
+- **Stage 8** — Revenue & Transaction Dashboard: `21/21 PASS`
+- **Stage 9** — Failure Handling & Audit Trail: `20/20 PASS`
 
 ---
 
-## 🛡️ Trust & Security Features
+## Security
 
-- **No Secret Exposure**: All API keys, database credentials, and secrets are strictly excluded from API responses, client payloads, and audit records.
-- **Sanitized Audit Trail**: Every status change, approval, and execution failure is recorded chronologically in `audit_logs` with parameterized PostgreSQL queries.
-- **Live Key Protection**: The execution engine explicitly rejects production Razorpay keys (`rzp_live_...`) with HTTP `403 Forbidden` to prevent accidental real-money charges during demonstrations.
-
----
-
-## ⚠️ Current Limitations
-
-1. **Synthetic Merchant Data**: Tested against a deterministic synthetic dataset of 75 products and 3,000 orders to provide reproducible benchmark results.
-2. **Razorpay Test Mode**: Integrates exclusively with Razorpay Test Mode; real customer credit cards and UPI accounts are never billed.
-3. **No Automatic Customer Outreach**: The current MVP generates campaigns and test orders, but does not automatically send live WhatsApp/email promotional codes to actual shoppers.
-4. **No Continuous Autonomous Activation**: Campaigns require explicit human merchant review and manual trigger; auto-execution is disabled by design.
+- **Environment Secrets**: `.env` is strictly gitignored. `.env.example` contains only safe placeholder templates.
+- **No Hardcoded Secrets**: Zero credentials or private keys are stored in source code.
+- **No Secret Leakage**: API responses, audit trails, and client payloads never expose credentials or database passwords.
+- **Sandbox Isolation**: Operates exclusively in Razorpay Test Mode.
 
 ---
 
-## 🔮 Future Scope & Production Roadmap
+## Current Limitations
 
-1. **Live Checkout Triggering**: Activate approved cross-sell campaigns dynamically within the Razorpay Standard Checkout or Magic Checkout flow for real-time customer cart suggestions.
-2. **Multi-Channel Delivery**: Direct webhook dispatch to WhatsApp Business API and Email Marketing providers (e.g., SendGrid/Klaviyo) upon merchant approval.
-3. **Automated Budget Throttling**: Real-time integration with live transaction webhooks to pause campaigns automatically when discount spend reaches the approved budget cap.
-4. **Reinforcement Learning from Merchant Feedback**: Continuously refine LLM opportunity scoring based on merchant approval/rejection rates and downstream campaign conversion.
+1. **Synthetic Merchant Data**: Evaluated on a deterministic synthetic dataset (75 products, 3,000 orders) to ensure reproducible benchmarking.
+2. **Razorpay Test Mode**: Uses test mode only; no real payment methods or live consumer cards are charged.
+3. **No Real Customer Outreach**: Does not send unsolicited emails, SMS, or WhatsApp promotional messages.
+4. **No Real-Time Future Customer Activation**: Campaigns are created and tested in the merchant portal; automatic cart injection for future checkout customers is not enabled in this prototype.
+5. **Merchant-Triggered Analysis**: Growth analysis is executed on demand by the merchant rather than via continuous background polling.
+
+---
+
+## Future Scope
+
+1. **Checkout-Integrated Dynamic Offers**: Inject approved cross-sell offers dynamically into Razorpay Standard Checkout and Magic Checkout when eligible cart conditions are met.
+2. **Multi-Channel Delivery**: Connect approved campaigns to WhatsApp Business API and email marketing platforms.
+3. **Budget Throttling & Live Signals**: Automatically monitor redemption webhooks and pause campaigns when budget limits are reached.
+4. **Production Razorpay Gateway**: Support production key verification with merchant OAuth integration.
+5. **Continuous Optimization**: Refine opportunity ranking based on downstream conversion analytics and merchant feedback loops.
+
+---
+
+## Important Prototype Note
+
+RevGen demonstrates a controlled, safety-bounded end-to-end growth workflow using historical/synthetic data and Razorpay Test Mode. It does not claim real merchant revenue or active customer outreach in this hackathon prototype.
