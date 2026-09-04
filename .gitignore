@@ -87,3 +87,7 @@ build/
 .temp/
 tmp/
 temp/
+
+# Demo videos (store as GitHub Release assets)
+*.mov
+*.mp4
