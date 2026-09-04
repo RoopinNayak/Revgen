@@ -7,7 +7,26 @@
 
 ## 📹 Demo Video
 
-> **📺 Demonstration Video**: *[Link to Demo Video](https://youtube.com) (Add your video URL here)*
+> **🎥 [Watch the RevGen Buildathon Demo](https://github.com/RoopinNayak/Revgen/releases/tag/v1.0.0)**
+>
+> Full demo showcasing AI-powered growth analysis, explainable upsell/cross-sell recommendations, merchant approval, Razorpay Test Mode execution, revenue metrics, and audit trail.
+
+---
+
+---
+## 🖥️ Product Screenshots
+
+### Merchant Dashboard
+![RevGen Dashboard](./revgen/docs/01_revgen_dashboard_clean.png)
+
+### AI Growth Analysis
+![AI Growth Analysis](./revgen/docs/02_ai_growth_analysis_clean.png)
+
+### Revenue & Razorpay Test Mode
+![Revenue and Execution](./revgen/docs/03_revenue_and_execution_clean.png)
+
+### Campaign Audit Trail
+![Campaign Audit Trail](./revgen/docs/04_campaign_audit_trail_clean.png)
 
 ---
 
