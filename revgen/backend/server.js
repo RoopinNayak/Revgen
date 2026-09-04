@@ -32,6 +32,7 @@ const {
   getExecutionByCampaignId,
   getAllExecutions,
 } = require('./src/models/campaignExecutionModel');
+const { executeWithRazorpay } = require('./src/integrations/razorpayCampaignExecutor');
 const { runGrowthAgent } = require('./src/agents/growthAgent');
 const { generateGrowthRecommendation } = require('./src/agents/growthRecommendationAgent');
 const { isAvailable: isLLMAvailable } = require('./src/ai/llmClient');
@@ -39,6 +40,7 @@ const { analyzeOpportunities } = require('./src/ai/llmGrowthAgent');
 const { selectOpportunity } = require('./src/ai/opportunitySelector');
 const { generateCampaignRecommendation } = require('./src/ai/campaignRecommendationAgent');
 const { runGrowthAnalysis } = require('./src/ai/growthAnalysisOrchestrator');
+const { getRevenueDashboardMetrics } = require('./src/analytics/revenueDashboard');
 
 
 
@@ -118,6 +120,21 @@ app.get('/api/dashboard', async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Unable to load dashboard data.',
+    });
+  }
+});
+
+// 1b. GET /api/dashboard/revenue — Read-only Revenue, ROI, and Transaction Dashboard metrics
+app.get('/api/dashboard/revenue', async (req, res) => {
+  try {
+    const data = await getRevenueDashboardMetrics();
+    res.json(data);
+  } catch (error) {
+    console.error('Error fetching revenue dashboard metrics:', error.message);
+    res.status(500).json({
+      status: 'error',
+      message: 'Unable to load revenue dashboard metrics.',
+      details: error.message,
     });
   }
 });
@@ -513,13 +530,27 @@ app.get('/api/campaigns/:id/audit', async (req, res) => {
   }
 });
 
-// 16. POST /api/campaigns/:id/execute — Safely simulate execution of approved campaign
+// 16. POST /api/campaigns/:id/execute — Execute approved campaign via Razorpay Test Mode or simulation
 app.post('/api/campaigns/:id/execute', async (req, res) => {
   try {
-    const options = {
-      forceFail: req.body && req.body.forceFail === true,
-    };
-    const result = await executeCampaign(req.params.id, options);
+    const useSimulation = req.body && req.body.useSimulation === true;
+    const forceFail = (req.body && req.body.forceFail === true) || req.query.forceFail === 'true';
+
+    // If client explicitly requests simulation, use the old simulation engine
+    if (useSimulation) {
+      const result = await executeCampaign(req.params.id, { forceFail });
+      return res.json(result);
+    }
+
+    // Otherwise, try Razorpay Test Mode execution
+    const rzpStatus = razorpayClient.isConfigured();
+    if (rzpStatus.configured && rzpStatus.mode === 'test') {
+      const result = await executeWithRazorpay(req.params.id, { forceFail });
+      return res.json(result);
+    }
+
+    // Razorpay not configured — fall back to simulation
+    const result = await executeCampaign(req.params.id, { forceFail });
     res.json(result);
   } catch (error) {
     console.error(`Execution error for campaign ${req.params.id}:`, error.message);
@@ -934,7 +965,79 @@ app.post('/api/agent/run-growth-analysis', async (req, res) => {
   }
 });
 
+// ─── Razorpay Integration Endpoints ─────────
+
+const razorpayClient = require('./src/integrations/razorpayClient');
+
+// 27. GET /api/razorpay/status — Razorpay Test Mode configuration status
+app.get('/api/razorpay/status', (req, res) => {
+  const status = razorpayClient.isConfigured();
+  res.json(status);
+});
+
+// 28. POST /api/razorpay/test-order — Create a minimal Razorpay Test Mode order (not connected to campaigns)
+app.post('/api/razorpay/test-order', async (req, res) => {
+  try {
+    const { amount } = req.body || {};
+
+    // Server-side validation
+    if (amount === undefined || amount === null) {
+      return res.status(400).json({
+        success: false,
+        error: 'amount is required (in INR rupees)',
+      });
+    }
+
+    const parsedAmount = Number(amount);
+    if (isNaN(parsedAmount) || !isFinite(parsedAmount)) {
+      return res.status(400).json({
+        success: false,
+        error: 'amount must be a valid number',
+      });
+    }
+
+    if (parsedAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'amount must be positive',
+      });
+    }
+
+    // Check configuration before attempting order
+    const status = razorpayClient.isConfigured();
+    if (!status.configured) {
+      return res.status(503).json({
+        success: false,
+        configured: false,
+        mode: 'test',
+        provider: 'razorpay',
+        error: status.reason || 'Razorpay test credentials are not configured',
+      });
+    }
+
+    const result = await razorpayClient.createTestOrder({
+      amount: parsedAmount,
+      currency: 'INR',
+      receipt: `revgen_test_${Date.now()}`,
+      notes: {
+        source: 'revgen',
+        purpose: 'test_mode_verification',
+      },
+    });
+
+    res.json(result);
+  } catch (error) {
+    console.error('Razorpay test order error:', error.message);
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // ─── Start Server ───────────────────────────
+
 app.listen(PORT, () => {
   console.log(`RevGen API is running on http://localhost:${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/api/health`);
@@ -953,6 +1056,9 @@ app.listen(PORT, () => {
   console.log(`Opportunity Selection: http://localhost:${PORT}/api/agent/opportunity-selection`);
   console.log(`Campaign Recommendation: http://localhost:${PORT}/api/agent/campaign-recommendation`);
   console.log(`Run Growth Analysis: POST http://localhost:${PORT}/api/agent/run-growth-analysis`);
+  console.log(`Razorpay Status: http://localhost:${PORT}/api/razorpay/status`);
+  console.log(`Razorpay Test Order: POST http://localhost:${PORT}/api/razorpay/test-order`);
+  console.log(`Revenue Dashboard: http://localhost:${PORT}/api/dashboard/revenue`);
   console.log(`Dashboard:   http://localhost:${PORT}`);
 });
 

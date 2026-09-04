@@ -23,6 +23,7 @@ const WORKFLOW_TRANSITIONS = {
   draft: ['pending_approval'],
   pending_approval: ['approved', 'rejected'],
   rejected: ['draft'],
+  failed: ['draft'],
 };
 
 /**

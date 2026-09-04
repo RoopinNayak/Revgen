@@ -20,8 +20,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initDashboard() {
   loadDashboard();
-  loadGrowthOpportunities();
   loadCampaigns();
+  loadRevenueDashboard();
   loadTopProducts();
   loadRecentOrders();
 }
@@ -409,7 +409,13 @@ function renderCampaignCard(camp) {
     `;
   } else if (rawStatus === 'approved') {
     actionButtonsHtml = `
-      <span class="approved-banner">✓ Approved</span>
+      <button class="btn btn-primary" type="button" id="exec-btn-${camp.id}" onclick="openExecuteModal(${camp.id})">
+        <span>🚀 Execute Campaign</span>
+      </button>
+    `;
+  } else if (rawStatus === 'executing') {
+    actionButtonsHtml = `
+      <span class="executing-banner">⏳ Executing...</span>
     `;
   } else if (rawStatus === 'rejected') {
     actionButtonsHtml = `
@@ -420,6 +426,19 @@ function renderCampaignCard(camp) {
   } else if (rawStatus === 'completed' || rawStatus === 'executed') {
     actionButtonsHtml = `
       <span class="completed-banner">✓ Completed</span>
+      <button class="btn btn-outline btn-sm" type="button" onclick="openExecutionResultModal(${camp.id})">
+        <span>View Execution</span>
+      </button>
+    `;
+  } else if (rawStatus === 'failed') {
+    actionButtonsHtml = `
+      <span class="failed-banner">✗ Failed</span>
+      <button class="btn btn-secondary btn-sm" type="button" onclick="openResetModal(${camp.id})">
+        <span>Reset to Draft</span>
+      </button>
+      <button class="btn btn-outline btn-sm" type="button" onclick="openAuditModal(${camp.id})">
+        <span>View Audit</span>
+      </button>
     `;
   }
 
@@ -641,22 +660,45 @@ async function openAuditModal(campaignId) {
 
       let actionLabel = log.action.replace(/_/g, ' ').toUpperCase();
       let icon = '📝';
-      if (log.action === 'campaign_submitted') icon = '📤';
-      if (log.action === 'campaign_approved') icon = '✅';
-      if (log.action === 'campaign_rejected') icon = '❌';
-      if (log.action === 'campaign_reset') icon = '🔄';
+      let badgeClass = '';
+
+      if (log.action === 'campaign_submitted') { icon = '📤'; actionLabel = 'Campaign Submitted for Review'; }
+      if (log.action === 'campaign_approved') { icon = '✅'; actionLabel = 'Campaign Approved'; badgeClass = 'audit-badge-success'; }
+      if (log.action === 'campaign_rejected') { icon = '❌'; actionLabel = 'Campaign Rejected'; badgeClass = 'audit-badge-danger'; }
+      if (log.action === 'campaign_reset') { icon = '🔄'; actionLabel = 'Campaign Reset to Draft'; }
+      if (log.action === 'campaign_execution_started') { icon = '🚀'; actionLabel = 'Execution Started'; badgeClass = 'audit-badge-executing'; }
+      if (log.action === 'razorpay_test_order_created') { icon = '⚡'; actionLabel = 'Razorpay Test Order Created'; badgeClass = 'audit-badge-razorpay'; }
+      if (log.action === 'campaign_execution_completed') { icon = '✓'; actionLabel = 'Execution Completed'; badgeClass = 'audit-badge-success'; }
+      if (log.action === 'campaign_execution_failed') { icon = '❌'; actionLabel = 'Execution Failed'; badgeClass = 'audit-badge-danger'; }
+      if (log.action === 'duplicate_execution_prevented') { icon = 'ℹ️'; actionLabel = 'Duplicate Execution Prevented'; }
 
       const actorLabel = (log.actor || 'merchant').toUpperCase();
-      const reasonText = log.details && log.details.reason ? log.details.reason : null;
+      const d = log.details || {};
+      const reasonText = d.reason || null;
+      const errorText = d.error || null;
+      const orderId = d.razorpayOrderId || null;
+      const mode = d.executionMode || null;
+      const amountINR = d.amountINR || d.transactionAmountINR || null;
 
       item.innerHTML = `
         <div class="audit-icon">${icon}</div>
         <div class="audit-content">
-          <span class="audit-action">${escapeHtml(actionLabel)}</span>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span class="audit-action">${escapeHtml(actionLabel)}</span>
+            ${mode ? `<span class="tx-badge badge-${mode === 'razorpay_test' ? 'razorpay' : 'simulation'}">${mode === 'razorpay_test' ? '⚡ Razorpay Test' : '🔬 Simulation'}</span>` : ''}
+          </div>
           <div class="audit-meta">
             <span>Actor: <strong>${escapeHtml(actorLabel)}</strong></span>
             <span>Date: ${formatDate(log.createdAt)}</span>
           </div>
+          ${orderId ? `<div class="audit-order-box">Order ID: <code class="order-id-chip">${escapeHtml(orderId)}</code> &middot; Amount: <strong>${formatCurrency(amountINR || 0)}</strong> (Test Mode)</div>` : ''}
+          ${errorText ? `
+            <div class="audit-error-box">
+              <span class="audit-error-title">Failure Reason:</span>
+              <span>${escapeHtml(errorText)}</span>
+              <div class="audit-trust-note">🛡️ Safety Guarantee: No fake order created &middot; No real money charged &middot; Campaign marked failed</div>
+            </div>
+          ` : ''}
           ${reasonText ? `<div class="audit-reason">Reason: "${escapeHtml(reasonText)}"</div>` : ''}
         </div>
       `;
@@ -757,10 +799,10 @@ async function openDetailsModal(campaignId) {
           <div class="step-desc">${escapeHtml(statusText)}</div>
         </div>
         <span class="pipeline-arrow">→</span>
-        <div class="pipeline-step disabled">
+        <div class="pipeline-step ${rawStatus === 'completed' || rawStatus === 'executing' ? 'active' : 'disabled'}">
           <div class="step-badge">6</div>
-          <div class="step-title">Execution</div>
-          <div class="step-desc">${isApproved ? 'Ready (Disabled in MVP)' : 'Awaiting Approval'}</div>
+          <div class="step-title">Razorpay Execution</div>
+          <div class="step-desc">${rawStatus === 'completed' ? '✓ Test Mode Order Created' : (isApproved ? 'Ready for Execution' : 'Awaiting Approval')}</div>
         </div>
       </div>
     `;
@@ -974,7 +1016,11 @@ async function openDetailsModal(campaignId) {
         </button>
       `;
     } else if (rawStatus === 'approved') {
-      actionButtonsHtml = `<span class="approved-banner">✓ Approved</span>`;
+      actionButtonsHtml = `
+        <button class="btn btn-primary" type="button" onclick="closeDetailsModal(); openExecuteModal(${camp.id});">
+          <span>🚀 Execute Campaign</span>
+        </button>
+      `;
     } else if (rawStatus === 'rejected') {
       actionButtonsHtml = `
         <button class="btn btn-secondary" type="button" onclick="closeDetailsModal(); openResetModal(${camp.id});">
@@ -982,7 +1028,14 @@ async function openDetailsModal(campaignId) {
         </button>
       `;
     } else if (rawStatus === 'completed' || rawStatus === 'executed') {
-      actionButtonsHtml = `<span class="completed-banner">✓ Completed</span>`;
+      actionButtonsHtml = `
+        <span class="completed-banner">✓ Completed</span>
+        <button class="btn btn-outline" type="button" onclick="closeDetailsModal(); openExecutionResultModal(${camp.id});">
+          <span>View Execution</span>
+        </button>
+      `;
+    } else if (rawStatus === 'failed') {
+      actionButtonsHtml = `<span class="failed-banner">✗ Execution Failed</span>`;
     }
 
     footerContainer.innerHTML = `
@@ -1005,7 +1058,7 @@ async function openDetailsModal(campaignId) {
 
       ${isApproved ? `
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 8px 12px; margin-bottom: 8px; font-size: 0.85rem; color: #34d399; font-weight: 600;">
-          ✓ APPROVED — Ready for Execution (Execution Disabled in MVP)
+          ✓ APPROVED — Ready for Razorpay Test Mode Execution
         </div>
       ` : ''}
 
@@ -1111,14 +1164,22 @@ async function openCreateModalFromOpportunity(opp) {
   overlay.classList.remove('hidden');
 
   let agentData = null;
-  try {
-    const queryStr = opp.productA && opp.productB ? `?productAId=${opp.productA.id}&productBId=${opp.productB.id}` : '';
-    const response = await fetch(`/api/agent/growth-recommendation-preview${queryStr}`);
-    if (response.ok) {
-      agentData = await response.json();
+  if (window.lastAnalysisRecommendation && window.lastAnalysisOpportunity?.productA?.id === opp.productA?.id) {
+    agentData = {
+      opportunity: opp,
+      recommendation: window.lastAnalysisRecommendation,
+      analysis: window.lastAnalysisRecommendation,
+    };
+  } else {
+    try {
+      const queryStr = opp.productA && opp.productB ? `?productAId=${opp.productA.id}&productBId=${opp.productB.id}` : '';
+      const response = await fetch(`/api/agent/growth-recommendation-preview${queryStr}`);
+      if (response.ok) {
+        agentData = await response.json();
+      }
+    } catch (err) {
+      console.warn('Could not fetch Growth Agent preview, falling back to local opportunity metrics:', err);
     }
-  } catch (err) {
-    console.warn('Could not fetch Growth Agent preview, falling back to local opportunity metrics:', err);
   }
 
   // Fallback defaults if agent API call is unavailable
@@ -1364,6 +1425,8 @@ async function handleCreateCampaignSubmit(opp) {
       confirmBtn.textContent = 'Create Campaign Draft';
     }
   }
+}
+
 // ─── Stage 4: On-Demand Growth Analysis ──────────────────────
 let isGrowthAnalysisRunning = false;
 
@@ -1383,6 +1446,11 @@ async function runOnDemandGrowthAnalysis() {
 
   // Show live loading panel
   panel.classList.remove('hidden');
+
+  const oppContainer = document.getElementById('opportunities-container');
+  if (oppContainer) {
+    oppContainer.innerHTML = '<div class="loading-state">Analyzing purchase patterns...</div>';
+  }
 
   const statusMessages = [
     '🔄 Fetching fresh merchant transaction data...',
@@ -1438,8 +1506,12 @@ async function runOnDemandGrowthAnalysis() {
 
     if (data.analysisStatus === 'no_opportunity') {
       renderZeroOpportunityResult(panel, data);
+      if (oppContainer) {
+        oppContainer.innerHTML = '<div class="empty-state">No growth opportunities found.</div>';
+      }
     } else if (data.analysisStatus === 'success') {
       renderGrowthAnalysisResult(panel, data);
+      loadGrowthOpportunities();
       showToast('✓ AI Growth Analysis complete!', 'success');
     } else {
       throw new Error(data.message || 'Unknown response status');
@@ -1448,6 +1520,14 @@ async function runOnDemandGrowthAnalysis() {
     clearInterval(statusInterval);
     console.error('Growth analysis error:', error);
     showToast('Unable to complete growth analysis. Please try again.', 'error');
+    if (oppContainer) {
+      oppContainer.innerHTML = `
+        <div class="empty-state">
+          <p style="font-weight: 500; margin-bottom: 4px;">No growth analysis run yet.</p>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">Click <strong>Run Growth Analysis</strong> to discover opportunities.</p>
+        </div>
+      `;
+    }
     panel.innerHTML = `
       <div class="analysis-card" style="border-color:rgba(239, 68, 68, 0.4);padding:var(--spacing-lg);">
         <div class="analysis-card-header" style="color:#f87171;">⚠️ Analysis Notice</div>
@@ -1638,27 +1718,373 @@ function renderGrowthAnalysisResult(container, data) {
   `;
 }
 
+function openCreateModal(index) {
+  return openCreateModalFromOpportunityIndex(index);
+}
+
 function openCreateModalFromAnalysis() {
   if (!window.lastAnalysisOpportunity) {
     showToast('No opportunity selected.', 'error');
     return;
   }
 
-  // Pre-fill opportunity into loadedOpportunities if not present
   const opp = window.lastAnalysisOpportunity;
-  let idx = (window.loadedOpportunities || []).findIndex(
-    o => o.productA?.id === opp.productA?.id && o.productB?.id === opp.productB?.id
-  );
-
-  if (idx === -1) {
-    if (!window.loadedOpportunities) window.loadedOpportunities = [];
-    window.loadedOpportunities.unshift(opp);
-    idx = 0;
-  }
-
-  openCreateModal(idx);
+  openCreateModalFromOpportunity(opp);
 }
 
+// ─── Razorpay Campaign Execution ─────────────────────────────
 
+/**
+ * Opens a confirmation modal before executing a campaign via Razorpay Test Mode.
+ */
+function openExecuteModal(campaignId) {
+  openWorkflowModal({
+    title: '🚀 Execute Campaign via Razorpay Test Mode',
+    message: 'This will create a Razorpay TEST MODE order for the discounted Product B price. No real money will be charged. This action cannot be undone.',
+    confirmText: 'Execute Test Campaign',
+    confirmClass: 'btn-primary',
+    showReasonInput: false,
+    onConfirm: () => handleCampaignExecution(campaignId, false),
+  });
+}
 
+/**
+ * Handles the actual campaign execution via POST /api/campaigns/:id/execute.
+ * Shows loading state and renders the result.
+ */
+async function handleCampaignExecution(campaignId, forceFail = false) {
+  const confirmBtn = document.getElementById('modal-confirm-btn');
+  if (confirmBtn) {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Creating Razorpay Test Mode order...';
+  }
 
+  try {
+    const response = await fetch(`/api/campaigns/${campaignId}/execute${forceFail ? '?forceFail=true' : ''}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ forceFail }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      const errMsg = data.error || data.message || 'Execution failed.';
+      closeWorkflowModal();
+      showToast(`❌ Execution Failed: ${errMsg}`, 'error');
+      loadCampaigns();
+      loadRevenueDashboard();
+      return;
+    }
+
+    closeWorkflowModal();
+
+    // Determine if Razorpay was actually called
+    const rzpCalled = data.razorpay?.razorpayCalled === true;
+    const isIdempotent = data.razorpay?.idempotent === true || data.simulation?.idempotent === true;
+
+    if (isIdempotent) {
+      showToast('ℹ️ Campaign was already executed (idempotent).', 'info');
+    } else if (rzpCalled) {
+      showToast('✓ Razorpay Test Mode order created successfully!', 'success');
+    } else {
+      showToast('✓ Campaign executed (simulation mode).', 'success');
+    }
+
+    // Refresh campaigns list and revenue dashboard
+    loadCampaigns();
+    loadRevenueDashboard();
+
+    // Show execution result
+    showExecutionResult(campaignId, data);
+  } catch (error) {
+    console.error(`Error executing campaign ${campaignId}:`, error);
+    closeWorkflowModal();
+    showToast(`Execution error: ${error.message}`, 'error');
+    loadCampaigns();
+    loadRevenueDashboard();
+  } finally {
+    if (confirmBtn) {
+      confirmBtn.disabled = false;
+    }
+  }
+}
+
+/**
+ * Shows the execution result in the details modal.
+ */
+function showExecutionResult(campaignId, data) {
+  const overlay = document.getElementById('details-modal-overlay');
+  const bodyContainer = document.getElementById('details-modal-body');
+  const footerContainer = document.getElementById('details-modal-footer');
+  const titleEl = document.getElementById('details-modal-title');
+
+  if (!overlay || !bodyContainer || !footerContainer) return;
+
+  if (titleEl) {
+    titleEl.textContent = `Campaign #${campaignId} — Execution Result`;
+  }
+
+  const exec = data.execution || {};
+  const rzp = data.razorpay || data.simulation || {};
+  const camp = data.campaign || {};
+
+  const rzpCalled = rzp.razorpayCalled === true;
+  const isIdempotent = rzp.idempotent === true;
+  const isTestMode = rzp.mode === 'test';
+  const orderId = rzp.razorpayOrderId || exec.details?.razorpayOrderId || null;
+  const amountINR = rzp.amountINR || (exec.details?.razorpayAmountINR) || 0;
+  const amountPaise = rzp.amount || (exec.details?.razorpayAmountPaise) || 0;
+
+  const modeLabel = rzpCalled ? 'Razorpay Test Mode' : 'Simulation';
+  const modeBadgeClass = rzpCalled ? 'badge-ai-mode' : 'badge-fallback-mode';
+
+  bodyContainer.innerHTML = `
+    <div style="text-align:center;margin-bottom:var(--spacing-md);">
+      <div style="font-size:2.5rem;margin-bottom:8px;">${exec.status === 'completed' ? '✅' : '❌'}</div>
+      <div style="font-size:1.2rem;font-weight:700;color:var(--text-primary);">
+        ${exec.status === 'completed' ? 'Execution Completed' : 'Execution Failed'}
+      </div>
+      <span class="analysis-badge ${modeBadgeClass}" style="margin-top:8px;display:inline-block;">
+        ${rzpCalled ? '🔗 Razorpay Test Mode' : '🔄 Simulation'}
+      </span>
+      ${isIdempotent ? '<div style="font-size:0.8rem;color:var(--text-secondary);margin-top:4px;">ℹ️ Idempotent: returned existing execution</div>' : ''}
+    </div>
+
+    ${rzpCalled ? `
+    <div class="details-section-title">🔗 Razorpay Test Mode Order</div>
+    <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:var(--radius-md);padding:var(--spacing-md);">
+      <div class="campaign-metrics-grid">
+        <div class="campaign-metric-item">
+          <span class="campaign-metric-label">Order ID</span>
+          <span class="campaign-metric-value" style="font-family:monospace;font-size:0.8rem;">${escapeHtml(orderId || 'N/A')}</span>
+        </div>
+        <div class="campaign-metric-item">
+          <span class="campaign-metric-label">Amount (INR)</span>
+          <span class="campaign-metric-value highlight">${formatCurrency(amountINR)}</span>
+        </div>
+        <div class="campaign-metric-item">
+          <span class="campaign-metric-label">Amount (Paise)</span>
+          <span class="campaign-metric-value">${formatNumber(amountPaise)}</span>
+        </div>
+        <div class="campaign-metric-item">
+          <span class="campaign-metric-label">Currency</span>
+          <span class="campaign-metric-value">INR</span>
+        </div>
+      </div>
+      <div style="margin-top:var(--spacing-sm);padding:8px 12px;background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:var(--radius-sm);font-size:0.8rem;color:#fbbf24;">
+        ⚠️ This is a <strong>Test Mode</strong> transaction. No real money was charged. This order exists only in the Razorpay Test Mode sandbox.
+      </div>
+    </div>
+    ` : ''}
+
+    <div class="details-section-title" style="margin-top:var(--spacing-md);">📊 Execution Details</div>
+    <div class="campaign-metrics-grid">
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Execution Mode</span>
+        <span class="campaign-metric-value">${escapeHtml(exec.executionMode || modeLabel)}</span>
+      </div>
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Status</span>
+        <span class="campaign-metric-value">${escapeHtml((exec.status || '').toUpperCase())}</span>
+      </div>
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Target Customers</span>
+        <span class="campaign-metric-value">${formatNumber(exec.targetCount || 0)}</span>
+      </div>
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Simulated Conversions</span>
+        <span class="campaign-metric-value">${formatNumber(exec.simulatedConversions || 0)}</span>
+      </div>
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Simulated Revenue</span>
+        <span class="campaign-metric-value highlight">${formatCurrency(exec.simulatedRevenue || 0)}</span>
+      </div>
+      <div class="campaign-metric-item">
+        <span class="campaign-metric-label">Est. Revenue Opportunity</span>
+        <span class="campaign-metric-value">${formatCurrency(exec.estimatedRevenueOpportunity || 0)}</span>
+      </div>
+    </div>
+  `;
+
+  footerContainer.innerHTML = `
+    <button class="btn btn-outline" type="button" onclick="closeDetailsModal(); openAuditModal(${campaignId});">
+      <span>View Audit Trail</span>
+    </button>
+    <button class="btn btn-secondary" type="button" onclick="closeDetailsModal()">Close</button>
+  `;
+
+  overlay.classList.remove('hidden');
+}
+
+/**
+ * Opens the execution result modal for a completed campaign.
+ */
+async function openExecutionResultModal(campaignId) {
+  const overlay = document.getElementById('details-modal-overlay');
+  const bodyContainer = document.getElementById('details-modal-body');
+  const titleEl = document.getElementById('details-modal-title');
+
+  if (!overlay || !bodyContainer) return;
+
+  if (titleEl) {
+    titleEl.textContent = `Campaign #${campaignId} — Execution Result`;
+  }
+  bodyContainer.innerHTML = '<div class="loading-state">Loading execution data...</div>';
+  overlay.classList.remove('hidden');
+
+  try {
+    const response = await fetch(`/api/campaigns/${campaignId}/execution`);
+    if (!response.ok) {
+      bodyContainer.innerHTML = '<div class="empty-state">No execution record found for this campaign.</div>';
+      return;
+    }
+
+    const data = await response.json();
+    showExecutionResult(campaignId, { execution: data.execution, razorpay: {
+      razorpayCalled: data.execution?.executionMode === 'razorpay_test',
+      mode: data.execution?.executionMode === 'razorpay_test' ? 'test' : 'simulation',
+      razorpayOrderId: data.execution?.details?.razorpayOrderId || null,
+      amountINR: data.execution?.details?.razorpayAmountINR || 0,
+      amount: data.execution?.details?.razorpayAmountPaise || 0,
+    }, campaign: { id: campaignId, status: 'completed' }});
+  } catch (error) {
+    console.error(`Error loading execution for campaign ${campaignId}:`, error);
+    bodyContainer.innerHTML = '<div class="error-state">Unable to load execution data.</div>';
+  }
+}
+
+// ─── Revenue & ROI Dashboard ──────────────────────────────────
+
+/**
+ * Loads revenue, ROI, and transaction execution data from GET /api/dashboard/revenue
+ */
+async function loadRevenueDashboard() {
+  try {
+    const response = await fetch('/api/dashboard/revenue');
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} loading revenue dashboard`);
+    }
+
+    const data = await response.json();
+    const summary = data.summary || {};
+    const roi = data.roi || {};
+    const transactions = data.transactions || [];
+
+    // 1. Update KPI Card values
+    const testValEl = document.getElementById('rev-kpi-test-value');
+    if (testValEl) testValEl.textContent = formatCurrency(summary.testRevenue || summary.testTransactionValue || 0);
+
+    const execCampEl = document.getElementById('rev-kpi-executed-campaigns');
+    if (execCampEl) execCampEl.textContent = `${formatNumber(summary.executedCampaigns || 0)} / ${formatNumber(summary.totalCampaigns || 0)}`;
+
+    const oppEl = document.getElementById('rev-kpi-opportunity');
+    if (oppEl) oppEl.textContent = formatCurrency(summary.estimatedRevenueOpportunity || 0);
+
+    const custEl = document.getElementById('rev-kpi-customers');
+    if (custEl) custEl.textContent = formatNumber(summary.estimatedAdditionalCustomers || 0);
+
+    const roiEl = document.getElementById('rev-kpi-roi');
+    const roiSubtextEl = document.getElementById('rev-kpi-roi-subtext');
+    if (roiEl) {
+      if (roi.estimatedRoi !== null && roi.estimatedRoi !== undefined) {
+        roiEl.textContent = `${roi.estimatedRoi}%`;
+        roiEl.classList.add('highlight');
+        if (roiSubtextEl) roiSubtextEl.textContent = 'Estimated ROI based on campaign upside';
+      } else {
+        roiEl.textContent = 'N/A';
+        roiEl.classList.remove('highlight');
+        if (roiSubtextEl) roiSubtextEl.textContent = 'Realized ROI unavailable (sandbox)';
+      }
+    }
+
+    // 2. Update 3 Pillars Distinction Cards
+    const distEstEl = document.getElementById('dist-est-opportunity');
+    if (distEstEl) distEstEl.textContent = formatCurrency(summary.estimatedRevenueOpportunity || 0);
+
+    const distTestEl = document.getElementById('dist-test-value');
+    if (distTestEl) distTestEl.textContent = formatCurrency(summary.testRevenue || summary.testTransactionValue || 0);
+
+    const distRealEl = document.getElementById('dist-real-revenue');
+    if (distRealEl) distRealEl.textContent = formatCurrency(0); // Explicitly zero
+
+    // 3. Render Transaction Table Rows
+    const tbody = document.getElementById('transactions-table-body');
+    if (!tbody) return;
+
+    if (transactions.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" class="table-empty">
+            No campaign executions recorded yet. Approve and execute a campaign to view live transaction data.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = transactions.map((tx) => renderTransactionRow(tx)).join('');
+  } catch (error) {
+    console.error('Error loading revenue dashboard:', error);
+    const tbody = document.getElementById('transactions-table-body');
+    if (tbody) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" class="table-empty" style="color: var(--error);">
+            Unable to load transaction records: ${escapeHtml(error.message)}
+          </td>
+        </tr>
+      `;
+    }
+  }
+}
+
+/**
+ * Renders an individual transaction row for the dashboard table.
+ */
+function renderTransactionRow(tx) {
+  const isRazorpay = tx.executionMode === 'razorpay_test';
+  const modeBadgeClass = isRazorpay ? 'badge-razorpay' : 'badge-simulation';
+  const modeLabel = isRazorpay ? '⚡ Razorpay Test' : '🔬 Simulation';
+
+  let statusBadgeClass = 'badge-completed';
+  if (tx.executionStatus === 'failed') statusBadgeClass = 'badge-failed';
+  if (tx.executionStatus === 'started' || tx.executionStatus === 'executing') statusBadgeClass = 'badge-executing';
+
+  const pairLabel = (tx.productA && tx.productB)
+    ? `${escapeHtml(tx.productA.name)} → ${escapeHtml(tx.productB.name)}`
+    : 'Cross-sell Pair';
+
+  const orderIdDisplay = tx.razorpayOrderId
+    ? `<code class="order-id-chip">${escapeHtml(tx.razorpayOrderId)}</code>`
+    : '<span class="text-muted">N/A (Simulation)</span>';
+
+  const txAmount = tx.transactionAmountINR || tx.discountedUnitPrice || 0;
+
+  return `
+    <tr>
+      <td><strong>#${tx.id}</strong></td>
+      <td>
+        <div style="font-weight:600; color:var(--text-primary);">${escapeHtml(tx.campaignName)}</div>
+        <div style="font-size:0.75rem; color:var(--text-muted);">Campaign #${tx.campaignId} &middot; ${escapeHtml(tx.campaignType)}</div>
+      </td>
+      <td>
+        <span style="font-size:0.85rem; color:var(--text-secondary);">${pairLabel}</span>
+      </td>
+      <td>
+        <span class="tx-badge ${modeBadgeClass}">${modeLabel}</span>
+      </td>
+      <td>
+        <span class="tx-badge ${statusBadgeClass}">${escapeHtml((tx.executionStatus || '').toUpperCase())}</span>
+      </td>
+      <td>${orderIdDisplay}</td>
+      <td style="font-weight:700; color:var(--accent-light);">${formatCurrency(txAmount)}</td>
+      <td style="font-size:0.8rem; color:var(--text-secondary);">${formatDate(tx.executedAt || tx.createdAt)}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" type="button" onclick="openExecutionResultModal(${tx.campaignId})">
+          <span>View</span>
+        </button>
+      </td>
+    </tr>
+  `;
+}

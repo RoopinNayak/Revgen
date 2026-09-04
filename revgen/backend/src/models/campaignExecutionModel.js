@@ -126,11 +126,13 @@ async function executeCampaign(campaignId, options = {}) {
 
     // 8. Controlled Condition for Failure / Rollback Testing
     if (options.forceFail) {
+      await client.query("UPDATE campaigns SET status = 'failed', updated_at = NOW() WHERE id = $1", [cId]);
       await client.query(
         `INSERT INTO audit_logs (campaign_id, action, actor, status, details, created_at)
          VALUES ($1, 'campaign_execution_failed', 'system', 'failed', $2, NOW())`,
-        [cId, { error: 'Simulated execution failure test triggered' }]
+        [cId, { executionMode: 'simulation', previousStatus: 'executing', newStatus: 'failed', error: 'Simulated execution failure test triggered' }]
       );
+      await client.query('COMMIT');
       const failErr = new Error('Simulated execution failure');
       failErr.statusCode = 500;
       throw failErr;
@@ -205,7 +207,7 @@ async function executeCampaign(campaignId, options = {}) {
       },
     };
   } catch (error) {
-    await client.query('ROLLBACK');
+    try { await client.query('ROLLBACK'); } catch (_) {}
     throw error;
   } finally {
     client.release();

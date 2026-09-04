@@ -77,7 +77,10 @@
         <div id="growth-analysis-panel" class="growth-analysis-panel hidden"></div>
 
         <div id="opportunities-container" class="opportunities-grid">
-          <div class="loading-state">Analyzing purchase patterns...</div>
+          <div class="empty-state">
+            <p style="font-weight: 500; margin-bottom: 4px;">No growth analysis run yet.</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Click <strong>Run Growth Analysis</strong> to discover opportunities.</p>
+          </div>
         </div>
       </section>
 
@@ -166,6 +169,105 @@
 
         <div id="campaigns-container" class="campaigns-grid">
           <div class="loading-state">Loading campaigns...</div>
+        </div>
+      </section>
+
+      <!-- Revenue & ROI Dashboard Section -->
+      <section class="revenue-dashboard-section">
+        <div class="section-header section-header-flex">
+          <div>
+            <h2 class="section-title">📊 Revenue, ROI &amp; Transaction Performance</h2>
+            <p class="section-subtitle">Real-time business impact derived from merchant-approved campaign executions.</p>
+          </div>
+          <button class="btn btn-secondary btn-sm" type="button" onclick="loadRevenueDashboard()">
+            <span>🔄 Refresh Revenue Data</span>
+          </button>
+        </div>
+
+        <!-- Sandbox / Test Mode Trust Banner -->
+        <div class="test-mode-banner">
+          <span class="test-banner-icon">🛡️</span>
+          <div class="test-banner-content">
+            <div class="test-banner-title">Razorpay Test Mode &amp; Simulation Analytics</div>
+            <div class="test-banner-desc">No real money was charged. Test transaction values reflect sandbox executions and deterministic conversion estimates.</div>
+          </div>
+        </div>
+
+        <!-- Revenue KPI Cards Grid -->
+        <div class="revenue-kpi-grid">
+          <div class="kpi-card revenue-card">
+            <div class="kpi-title">💰 Test Transaction Value</div>
+            <div class="kpi-value highlight" id="rev-kpi-test-value">₹0.00</div>
+            <div class="kpi-subtext">Executed sandbox / simulation transactions</div>
+          </div>
+          <div class="kpi-card revenue-card">
+            <div class="kpi-title">🚀 Executed Campaigns</div>
+            <div class="kpi-value" id="rev-kpi-executed-campaigns">0</div>
+            <div class="kpi-subtext">Completed / executing growth campaigns</div>
+          </div>
+          <div class="kpi-card revenue-card">
+            <div class="kpi-title">📈 Estimated Revenue Opportunity</div>
+            <div class="kpi-value" id="rev-kpi-opportunity">₹0.00</div>
+            <div class="kpi-subtext">Deterministic revenue upside across catalog</div>
+          </div>
+          <div class="kpi-card revenue-card">
+            <div class="kpi-title">👥 Customers Targeted</div>
+            <div class="kpi-value" id="rev-kpi-customers">0</div>
+            <div class="kpi-subtext">Audience reach across executed campaigns</div>
+          </div>
+          <div class="kpi-card revenue-card">
+            <div class="kpi-title">📊 ROI Status</div>
+            <div class="kpi-value" id="rev-kpi-roi">N/A</div>
+            <div class="kpi-subtext" id="rev-kpi-roi-subtext">Estimated ROI based on campaign upside</div>
+          </div>
+        </div>
+
+        <!-- Demo Distinction: 3 Pillars Card -->
+        <div class="distinction-grid">
+          <div class="distinction-card">
+            <div class="distinction-badge estimated">1. ESTIMATED OPPORTUNITY</div>
+            <div class="distinction-amount" id="dist-est-opportunity">₹0.00</div>
+            <div class="distinction-desc">Predictive model upside based on basket co-purchase affinity and missed customer volume.</div>
+          </div>
+          <div class="distinction-card">
+            <div class="distinction-badge sandbox">2. TEST TRANSACTION VALUE</div>
+            <div class="distinction-amount highlight" id="dist-test-value">₹0.00</div>
+            <div class="distinction-desc">Sandbox orders executed via Razorpay Test Mode and deterministic conversion models.</div>
+          </div>
+          <div class="distinction-card">
+            <div class="distinction-badge real">3. REAL MERCHANT REVENUE</div>
+            <div class="distinction-amount muted" id="dist-real-revenue">₹0.00</div>
+            <div class="distinction-desc">Real money claimed only upon verified bank settlement and live payment capture.</div>
+          </div>
+        </div>
+
+        <!-- Execution / Transaction History Table -->
+        <div class="card transaction-card" style="margin-top: var(--spacing-lg);">
+          <div class="card-header">
+            <h2 class="card-title">💳 Campaign Executions &amp; Transactions</h2>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Execution ID</th>
+                  <th>Campaign</th>
+                  <th>Product Pair</th>
+                  <th>Mode</th>
+                  <th>Status</th>
+                  <th>Razorpay Order ID</th>
+                  <th>Transaction Value</th>
+                  <th>Date &amp; Time</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="transactions-table-body">
+                <tr>
+                  <td colspan="9" class="table-loading">Loading transaction history...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
